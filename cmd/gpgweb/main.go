@@ -13,9 +13,14 @@ import (
 )
 
 func main() {
-	// Run migrations from embedded files (runtime)
-	if err := migratepkg.RunMigrations(); err != nil {
-		log.Fatalf("migration error: %v", err)
+	// Run migrations via golang-migrate only when DATABASE_URL is set (postgres).
+	// For the default sqlite (local file) we skip golang-migrate at runtime and
+	// instead use the simple SQL executor below to avoid cgo sqlite driver issues
+	// inside minimal container images.
+	if os.Getenv("DATABASE_URL") != "" {
+		if err := migratepkg.RunMigrations(); err != nil {
+			log.Fatalf("migration error: %v", err)
+		}
 	}
 
 	db, err := dbpkg.OpenDB()
