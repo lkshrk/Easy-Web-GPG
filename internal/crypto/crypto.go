@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 
@@ -14,6 +13,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -111,9 +111,8 @@ func VerifyAuthCookieValue(val string, maxAgeSeconds int64) bool {
 	if err != nil {
 		return false
 	}
-	parts := make([]string, 2)
-	n, _ := fmt.Sscanf(val, "%[^:]:%s", &parts[0], &parts[1])
-	if n != 2 {
+	parts := strings.SplitN(val, ":", 2)
+	if len(parts) != 2 {
 		return false
 	}
 	payload := parts[0]
