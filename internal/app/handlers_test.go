@@ -114,9 +114,79 @@ func TestEncryptDecryptHandlers(t *testing.T) {
 
 // templateMust tries to parse the templates file used by the app for tests.
 func templateMust() *template.Template {
-	t, err := template.ParseFiles("../../templates/index.html")
+	// parse both index and login templates if present
+	files := []string{"../../templates/index.html", "../../templates/login.html"}
+	t, err := template.ParseFiles(files...)
 	if err != nil {
 		panic(err)
 	}
 	return t
+}
+
+func TestAuthFlow(t *testing.T) {
+	// Setup master key and password
+	raw := make([]byte, 32)
+	for i := range raw {
+		raw[i] = byte(i + 1)
+	}
+	os.Setenv("MASTER_KEY", base64.StdEncoding.EncodeToString(raw))
+	os.Setenv("MASTER_PASSWORD", "s3cret")
+
+	db, err := sqlx.Open("sqlite", "file::memory:?mode=memory&cache=shared")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := dbpkg.ApplySQLMigrations(db, "../../migrations/sql"); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	tmpl := templateMust()
+	a := &apppkg.App{DB: db, Templates: tmpl}
+
+	// Visit index -> should see login form
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	a.IndexHandler(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("index status before auth: %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "Enter master password") {
+		t.Fatalf("expected login page, got: %s", w.Body.String())
+	}
+
+	// Post correct password to /auth
+	form := url.Values{}
+	form.Set("password", "s3cret")
+	req2 := httptest.NewRequest(http.MethodPost, "/auth", strings.NewReader(form.Encode()))
+	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w2 := httptest.NewRecorder()
+	a.AuthHandler(w2, req2)
+	if w2.Code != http.StatusSeeOther {
+		t.Fatalf("auth handler status: %d body: %s", w2.Code, w2.Body.String())
+	}
+	// grab cookie
+	res := w2.Result()
+	cookies := res.Cookies()
+	var authCookie *http.Cookie
+	for _, c := range cookies {
+		if c.Name == "webgpg_auth" {
+			authCookie = c
+			break
+		}
+	}
+	if authCookie == nil {
+		t.Fatalf("auth cookie not set")
+	}
+
+	// Visit index with cookie -> should see app UI
+	req3 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req3.AddCookie(authCookie)
+	w3 := httptest.NewRecorder()
+	a.IndexHandler(w3, req3)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("index status after auth: %d", w3.Code)
+	}
+	if !strings.Contains(w3.Body.String(), "Add Key") {
+		t.Fatalf("expected app UI after auth, got: %s", w3.Body.String())
+	}
 }
