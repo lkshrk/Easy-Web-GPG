@@ -12,7 +12,7 @@ RUN go env -w GOPROXY=https://proxy.golang.org
 COPY . .
 
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-RUN go build -ldflags="-s -w" -o /web-gpg
+RUN go build -ldflags="-s -w" -o /web-gpg ./cmd/gpgweb
 
 ### Final image: minimal
 FROM gcr.io/distroless/static:nonroot
