@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PGP Web — Encrypt / Decrypt</title>
+    <link rel="stylesheet" href="/static/dist/styles.css" />
+  </head>
+  <body class="bg-gray-50 min-h-screen flex items-center justify-center">
+    <main class="max-w-3xl w-full p-6 bg-white rounded shadow">
+      <h1 class="text-2xl font-semibold mb-4">PGP Web — Encrypt / Decrypt</h1>
+
+      <section class="mb-6">
+        <h2 class="font-medium mb-2">Add Key</h2>
+        <form action="/keys" method="post" class="space-y-2">
+          <div>
+            <label class="block text-sm">Name</label>
+            <input name="name" class="w-full border px-2 py-1" />
+          </div>
+          <div>
+            <label class="block text-sm">Armored Key</label>
+            <textarea name="armored" rows="6" class="w-full border px-2 py-1"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm">Passphrase (optional)</label>
+            <input name="password" type="password" class="w-full border px-2 py-1" />
+          </div>
+          <div>
+            <button class="btn" type="submit">Add Key</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="mb-6">
+        <h2 class="font-medium mb-2">Encrypt / Decrypt</h2>
+        <div class="grid grid-cols-2 gap-4">
+          <form hx-post="/encrypt" hx-swap="outerHTML" hx-target="#encrypt-result" method="post" class="space-y-2">
+            <h3 class="text-sm font-semibold">Encrypt</h3>
+            <div>
+              <label class="block text-sm">Key</label>
+              <select name="key" class="w-full border px-2 py-1">
+                {{range .Keys}}
+                {{if not .IsPrivate}}
+                <option value="{{.ID}}">{{.Name}}</option>
+                {{end}}
+                {{end}}
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm">Plaintext</label>
+              <textarea name="input" rows="6" class="w-full border px-2 py-1"></textarea>
+            </div>
+            <div>
+              <button class="btn" type="submit">Encrypt</button>
+            </div>
+          </form>
+
+          <div id="encrypt-result" class="col-span-1"></div>
+
+          <form hx-post="/decrypt" hx-swap="outerHTML" hx-target="#decrypt-result" method="post" class="space-y-2">
+            <h3 class="text-sm font-semibold">Decrypt</h3>
+            <div>
+              <label class="block text-sm">Key</label>
+              <select name="key" class="w-full border px-2 py-1">
+                {{range .Keys}}
+                {{if .IsPrivate}}
+                <option value="{{.ID}}">{{.Name}}</option>
+                {{end}}
+                {{end}}
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm">Armored Message</label>
+              <textarea name="input" rows="6" class="w-full border px-2 py-1"></textarea>
+            </div>
+            <div>
+              <button class="btn" type="submit">Decrypt</button>
+            </div>
+          </form>
+          <div id="decrypt-result" class="col-span-1"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="font-medium mb-2">Stored Keys</h2>
+        <div>
+          <label class="block text-sm mb-1">Select a stored key</label>
+          <form class="flex items-start gap-2" method="get" action="/keys/view">
+            <select id="stored-keys" name="id" class="flex-1 border px-2 py-1">
+              {{range .Keys}}
+              <option value="{{.ID}}">{{.Name}} — {{if .IsPrivate}}Private{{else}}Public{{end}} — Added {{.CreatedAt}}</option>
+              {{else}}
+              <option disabled selected>No keys yet</option>
+              {{end}}
+            </select>
+            <div class="flex-shrink-0">
+              <button type="submit" class="btn">View</button>
+            </div>
+            <div class="flex-shrink-0">
+              <button type="submit" formaction="/keys/delete" formmethod="post" class="btn" onclick="return confirm('Delete selected key?')">Delete</button>
+            </div>
+          </form>
+          <div id="key-detail" class="mt-2"></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: lkshrk
+      changes:
+        - createTable:
+            tableName: keys
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: name
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: armored
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_private
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+              - column:
+                  name: encrypted_password
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP

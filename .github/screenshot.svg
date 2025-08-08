@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="600" viewBox="0 0 1200 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0%" stop-color="#7dd3fc" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+    <style>
+      .bg{fill:#0f172a}
+      .card{fill:#0b1220;stroke:#111827;stroke-width:1}
+      .muted{fill:#9ca3af;font-family:Inter, Arial, sans-serif;font-size:14px}
+      .title{fill:#ffffff;font-family:Inter, Arial, sans-serif;font-size:24px;font-weight:600}
+      .btn{fill:url(#g);stroke:#0369a1;cursor:hand}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="600" rx="0"/>
+  <g transform="translate(60,40)">
+    <rect class="card" x="0" y="0" width="1080" height="520" rx="10"/>
+    <text class="title" x="28" y="44">Web-GPG — Secure GPG operations via the web</text>
+    <text class="muted" x="28" y="72">Example UI: generate keys, encrypt/decrypt messages, and view logs (server-rendered via HTMX)</text>
+
+    <!-- Left column -->
+    <rect x="28" y="92" width="420" height="360" rx="8" fill="#071026" stroke="#0f172a"/>
+    <text class="muted" x="44" y="120">Keys</text>
+    <rect x="44" y="132" width="372" height="44" rx="6" fill="#062033"/>
+    <text class="muted" x="56" y="160">Primary Key • created 2025-08-01</text>
+    <rect x="44" y="188" width="372" height="44" rx="6" fill="#062033"/>
+    <text class="muted" x="56" y="216">Backup Key • created 2025-07-15</text>
+    <g transform="translate(44,246)">
+      <rect x="0" y="0" width="140" height="36" rx="6" class="btn"/>
+      <text x="18" y="24" fill="#021124" font-family="Inter, Arial" font-size="14">Generate</text>
+      <rect x="156" y="0" width="140" height="36" rx="6" fill="#063b5a"/>
+      <text x="170" y="24" fill="#9de0ff" font-family="Inter, Arial" font-size="14">Export</text>
+    </g>
+
+    <!-- Right column -->
+    <rect x="468" y="92" width="620" height="360" rx="8" fill="#071026" stroke="#0f172a"/>
+    <text class="muted" x="484" y="120">Encrypt / Decrypt</text>
+    <rect x="484" y="132" width="564" height="120" rx="6" fill="#062033"/>
+    <text class="muted" x="496" y="160">Enter message to encrypt</text>
+    <rect x="484" y="264" width="220" height="44" rx="6" class="btn"/>
+    <text x="504" y="292" fill="#021124" font-family="Inter, Arial" font-size="14">Encrypt</text>
+    <rect x="716" y="264" width="220" height="44" rx="6" fill="#063b5a"/>
+    <text x="736" y="292" fill="#9de0ff" font-family="Inter, Arial" font-size="14">Decrypt</text>
+
+    <text class="muted" x="484" y="336">Recent activity</text>
+    <rect x="484" y="348" width="564" height="96" rx="6" fill="#041526"/>
+    <text class="muted" x="496" y="374">• 2025-08-08 10:22 — Encrypted message to alice@example.com</text>
+    <text class="muted" x="496" y="394">• 2025-08-07 18:11 — Generated new keypair (RSA-2048)</text>
+  </g>
+</svg>

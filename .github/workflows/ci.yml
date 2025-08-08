@@ -1,0 +1,77 @@
+name: CI - Test, Build and Release
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Regenerate screenshot
+        run: |
+          set -e
+          if [ -f .github/screenshot.svg ]; then
+            sudo apt-get update -y
+            sudo apt-get install -y librsvg2-bin >/dev/null
+            # render PNG from SVG (1200x800)
+            rsvg-convert -w 1200 -h 800 .github/screenshot.svg -o .github/screenshot.png || true
+          else
+            echo "no svg to render"
+          fi
+          # commit and push only for branch/tag runs (not for forked PRs)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/screenshot.png || true
+          BRANCH="$${GITHUB_REF#refs/heads/}"
+          if git diff --staged --quiet; then
+            echo "screenshot unchanged"
+          else
+            if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+              git commit -m "ci: regenerate screenshot"
+              git push origin "HEAD:$${BRANCH}"
+            else
+              echo "Pull request build; not pushing screenshot changes"
+            fi
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      # Node/npm/pnpm removed from repository; build CSS uses committed fallback stylesheet
+      # Build step will copy the committed fallback CSS via Makefile's build-css target.
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Set image tags
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+            echo "DOCKER_TAGS=ghcr.io/lkshrk/gpg-web:${TAG},ghcr.io/lkshrk/gpg-web:latest" >> $GITHUB_ENV
+          else
+            echo "DOCKER_TAGS=ghcr.io/lkshrk/gpg-web:latest,ghcr.io/lkshrk/gpg-web:${GITHUB_SHA}" >> $GITHUB_ENV
+          fi
+
+      - name: Build & push container image (GHCR)
+        if: startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ env.DOCKER_TAGS }}

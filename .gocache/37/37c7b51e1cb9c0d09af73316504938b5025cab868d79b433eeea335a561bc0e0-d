@@ -1,0 +1,6 @@
+# test log
+stat ../../migrations/sql
+open ../../migrations/sql
+open ../../migrations/sql/1_create_keys.up.sql
+open ../../templates/index.html
+getenv MASTER_KEY
