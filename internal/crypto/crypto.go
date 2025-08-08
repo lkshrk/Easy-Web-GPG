@@ -6,8 +6,15 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"os"
+
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"strconv"
+	"time"
 )
 
 // Master key should be provided as base64 in env MASTER_KEY
@@ -78,4 +85,55 @@ func Decrypt(b64 string) ([]byte, error) {
 		return nil, err
 	}
 	return pt, nil
+}
+
+// CreateAuthCookieValue creates a signed timestamp token used for the auth cookie.
+// The returned value is of the form "<ts>:<hex-hmac>" where HMAC is computed
+// using the master key as secret. The token is valid when verified and the
+// timestamp is within the allowed window.
+func CreateAuthCookieValue() (string, error) {
+	key, err := masterKey()
+	if err != nil {
+		return "", err
+	}
+	ts := time.Now().Unix()
+	payload := strconv.FormatInt(ts, 10)
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(payload))
+	sig := mac.Sum(nil)
+	return payload + ":" + hex.EncodeToString(sig), nil
+}
+
+// VerifyAuthCookieValue verifies a cookie value created by CreateAuthCookieValue
+// and checks that the timestamp is not older than maxAge (seconds).
+func VerifyAuthCookieValue(val string, maxAgeSeconds int64) bool {
+	key, err := masterKey()
+	if err != nil {
+		return false
+	}
+	parts := make([]string, 2)
+	n, _ := fmt.Sscanf(val, "%[^:]:%s", &parts[0], &parts[1])
+	if n != 2 {
+		return false
+	}
+	payload := parts[0]
+	sigHex := parts[1]
+	sig, err := hex.DecodeString(sigHex)
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(payload))
+	expected := mac.Sum(nil)
+	if !hmac.Equal(expected, sig) {
+		return false
+	}
+	ts, err := strconv.ParseInt(payload, 10, 64)
+	if err != nil {
+		return false
+	}
+	if time.Now().Unix()-ts > maxAgeSeconds {
+		return false
+	}
+	return true
 }

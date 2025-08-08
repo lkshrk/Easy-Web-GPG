@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -20,6 +21,26 @@ type App struct {
 }
 
 func (a *App) IndexHandler(w http.ResponseWriter, r *http.Request) {
+	// If MASTER_PASSWORD is set, require authentication via cookie
+	masterPass := os.Getenv("MASTER_PASSWORD")
+	if masterPass != "" {
+		if c, err := r.Cookie("webgpg_auth"); err == nil {
+			if cm.VerifyAuthCookieValue(c.Value, 24*60*60) {
+				// proceed to render UI
+			} else {
+				if err := a.Templates.ExecuteTemplate(w, "login.html", nil); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+				return
+			}
+		} else {
+			if err := a.Templates.ExecuteTemplate(w, "login.html", nil); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+	}
+
 	var keys []mm.Key
 	if err := a.DB.Select(&keys, "SELECT id, name, armored, is_private, encrypted_password, created_at FROM keys ORDER BY created_at DESC"); err != nil && err != sql.ErrNoRows {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -272,5 +293,48 @@ func (a *App) DeleteKeyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// AuthHandler verifies the posted master password and sets a signed cookie
+// valid for one day. The expected password is read from env MASTER_PASSWORD.
+func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	pass := r.FormValue("password")
+	expected := os.Getenv("MASTER_PASSWORD")
+	if expected == "" {
+		http.Error(w, "server not configured for master password", http.StatusInternalServerError)
+		return
+	}
+	if pass != expected {
+		// render login with error
+		a.Templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"Error": "invalid password"})
+		return
+	}
+	// create signed cookie value
+	val, err := cm.CreateAuthCookieValue()
+	if err != nil {
+		http.Error(w, "failed to create auth token", http.StatusInternalServerError)
+		return
+	}
+	cookie := &http.Cookie{
+		Name:     "webgpg_auth",
+		Value:    val,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   24 * 60 * 60,
+		SameSite: http.SameSiteLaxMode,
+	}
+	http.SetCookie(w, cookie)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// LogoutHandler removes the auth cookie.
+func (a *App) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	cookie := &http.Cookie{Name: "webgpg_auth", Value: "", Path: "/", MaxAge: -1}
+	http.SetCookie(w, cookie)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

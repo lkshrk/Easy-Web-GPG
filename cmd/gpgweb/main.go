@@ -30,10 +30,20 @@ func main() {
 
 	// Resolve template path candidates
 	tplCandidates := []string{"templates/index.html", "./templates/index.html", "../templates/index.html", "../../templates/index.html", "/templates/index.html"}
+	// Also look for login template
+	tplCandidates2 := []string{"templates/login.html", "./templates/login.html", "../templates/login.html"}
 	var tmpl *template.Template
 	for _, c := range tplCandidates {
 		if _, err := os.Stat(c); err == nil {
-			tmpl = template.Must(template.ParseFiles(c))
+			// try to parse both index and login templates if available
+			files := []string{c}
+			for _, l := range tplCandidates2 {
+				if _, err := os.Stat(l); err == nil {
+					files = append(files, l)
+					break
+				}
+			}
+			tmpl = template.Must(template.ParseFiles(files...))
 			break
 		}
 	}
@@ -67,6 +77,8 @@ func main() {
 	http.HandleFunc("/keys", a.AddKeyHandler)
 	http.HandleFunc("/keys/view", a.ViewKeyHandler)
 	http.HandleFunc("/keys/delete", a.DeleteKeyHandler)
+	http.HandleFunc("/auth", a.AuthHandler)
+	http.HandleFunc("/logout", a.LogoutHandler)
 	http.HandleFunc("/encrypt", a.EncryptHandler)
 	http.HandleFunc("/decrypt", a.DecryptHandler)
 
