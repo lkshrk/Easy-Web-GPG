@@ -7,38 +7,44 @@
     <link rel="stylesheet" href="/static/dist/styles.css" />
   </head>
   <body class="bg-gray-50 min-h-screen flex items-center justify-center">
-    <main class="max-w-3xl w-full p-6 bg-white rounded shadow">
-      <h1 class="text-2xl font-semibold mb-4">PGP Web — Encrypt / Decrypt</h1>
+    <main class="max-w-5xl w-full p-6 bg-slate-50 rounded-lg">
+      <div class="mx-auto bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-100">
+        <div class="p-6 lg:flex lg:items-start lg:gap-6">
 
-      <section class="mb-6">
+          <div class="flex-1">
+            <h1 class="text-2xl font-semibold text-slate-800 mb-1">PGP Web</h1>
+            <p class="text-sm text-slate-500 mb-4">Securely encrypt and decrypt messages with stored PGP keys.</p>
+
+
+      <section class="mb-6 px-6">
         <h2 class="font-medium mb-2">Add Key</h2>
-        <form action="/keys" method="post" class="space-y-2">
+        <form action="/keys" method="post" class="space-y-4">
           <div>
             <label class="block text-sm">Name</label>
-            <input name="name" class="w-full border px-2 py-1" />
+            <input name="name" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
           </div>
           <div>
             <label class="block text-sm">Armored Key</label>
-            <textarea name="armored" rows="6" class="w-full border px-2 py-1"></textarea>
+            <textarea name="armored" rows="6" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
           </div>
           <div>
             <label class="block text-sm">Passphrase (optional)</label>
-            <input name="password" type="password" class="w-full border px-2 py-1" />
+            <input name="password" type="password" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
           </div>
           <div>
-            <button class="btn" type="submit">Add Key</button>
+            <button class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" type="submit">Add Key</button>
           </div>
         </form>
       </section>
 
-      <section class="mb-6">
+      <section class="mb-6 px-6">
         <h2 class="font-medium mb-2">Encrypt / Decrypt</h2>
         <div class="grid grid-cols-2 gap-4">
-          <form hx-post="/encrypt" hx-swap="outerHTML" hx-target="#encrypt-result" method="post" class="space-y-2">
+          <form hx-post="/encrypt" hx-swap="outerHTML" hx-target="#encrypt-result" method="post" class="space-y-4">
             <h3 class="text-sm font-semibold">Encrypt</h3>
             <div>
               <label class="block text-sm">Key</label>
-              <select name="key" class="w-full border px-2 py-1">
+              <select name="key" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                 {{range .Keys}}
                 {{if not .IsPrivate}}
                 <option value="{{.ID}}">{{.Name}}</option>
@@ -48,20 +54,20 @@
             </div>
             <div>
               <label class="block text-sm">Plaintext</label>
-              <textarea name="input" rows="6" class="w-full border px-2 py-1"></textarea>
+              <textarea name="input" rows="6" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
             </div>
             <div>
-              <button class="btn" type="submit">Encrypt</button>
+              <button class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" type="submit">Encrypt</button>
             </div>
           </form>
 
           <div id="encrypt-result" class="col-span-1"></div>
 
-          <form hx-post="/decrypt" hx-swap="outerHTML" hx-target="#decrypt-result" method="post" class="space-y-2">
+          <form hx-post="/decrypt" hx-swap="outerHTML" hx-target="#decrypt-result" method="post" class="space-y-4">
             <h3 class="text-sm font-semibold">Decrypt</h3>
             <div>
               <label class="block text-sm">Key</label>
-              <select name="key" class="w-full border px-2 py-1">
+              <select name="key" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                 {{range .Keys}}
                 {{if .IsPrivate}}
                 <option value="{{.ID}}">{{.Name}}</option>
@@ -71,16 +77,19 @@
             </div>
             <div>
               <label class="block text-sm">Armored Message</label>
-              <textarea name="input" rows="6" class="w-full border px-2 py-1"></textarea>
+              <textarea name="input" rows="6" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
             </div>
             <div>
-              <button class="btn" type="submit">Decrypt</button>
+              <button class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" type="submit">Decrypt</button>
             </div>
           </form>
           <div id="decrypt-result" class="col-span-1"></div>
         </div>
       </section>
 
+          </div>
+        </div>
+      </div>
       <section>
         <h2 class="font-medium mb-2">Stored Keys</h2>
         <div>
@@ -94,10 +103,10 @@
               {{end}}
             </select>
             <div class="flex-shrink-0">
-              <button type="submit" class="btn">View</button>
+              <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium">View</button>
             </div>
             <div class="flex-shrink-0">
-              <button type="submit" formaction="/keys/delete" formmethod="post" class="btn" onclick="return confirm('Delete selected key?')">Delete</button>
+              <button type="submit" formaction="/keys/delete" formmethod="post" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" onclick="return confirm('Delete selected key?')">Delete</button>
             </div>
           </form>
           <div id="key-detail" class="mt-2"></div>

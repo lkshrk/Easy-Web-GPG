@@ -33,3 +33,4 @@ bin/
 .env.local
 
 data.db
+node_modules/

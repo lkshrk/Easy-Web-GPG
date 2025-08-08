@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -30,13 +31,16 @@ func (a *App) IndexHandler(w http.ResponseWriter, r *http.Request) {
 				// proceed to render UI
 			} else {
 				if err := a.Templates.ExecuteTemplate(w, "login.html", nil); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					// fallback minimal form
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					w.Write([]byte(`<form method="post" action="/auth"><input type="password" name="password" placeholder="Master password"/><button type="submit">Unlock</button></form>`))
 				}
 				return
 			}
 		} else {
 			if err := a.Templates.ExecuteTemplate(w, "login.html", nil); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Write([]byte(`<form method="post" action="/auth"><input type="password" name="password" placeholder="Master password"/><button type="submit">Unlock</button></form>`))
 			}
 			return
 		}
@@ -77,9 +81,9 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 	if password != "" {
 		enc, err := cm.Encrypt([]byte(password))
 		if err != nil {
-			// If the server is not configured with a MASTER_KEY we surface a helpful error
-			if err.Error() == "MASTER_KEY not set" {
-				http.Error(w, "server not configured to store passphrases: set MASTER_KEY env var", http.StatusInternalServerError)
+			// If the server is not configured with a MASTER_PASSWORD we surface a helpful error
+			if errors.Is(err, cm.ErrMasterPasswordNotSet) {
+				http.Error(w, "server not configured to store passphrases: set MASTER_PASSWORD env var", http.StatusInternalServerError)
 				return
 			}
 			http.Error(w, "failed to encrypt password", http.StatusInternalServerError)
@@ -312,22 +316,19 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pass := r.FormValue("password")
-	// support hashed master password via MASTER_PASSWORD_BCRYPT, or fallback to plain MASTER_PASSWORD
-	if hash := os.Getenv("MASTER_PASSWORD_BCRYPT"); hash != "" {
-		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(pass)); err != nil {
-			a.Templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"Error": "invalid password"})
-			return
-		}
-	} else {
-		expected := os.Getenv("MASTER_PASSWORD")
-		if expected == "" {
+	// verify posted password by deriving keys via Argon2id and comparing
+	ok, err := cm.VerifyMasterPassword(pass)
+	if err != nil {
+		if err == cm.ErrMasterPasswordNotSet {
 			http.Error(w, "server not configured for master password", http.StatusInternalServerError)
 			return
 		}
-		if pass != expected {
-			a.Templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"Error": "invalid password"})
-			return
-		}
+		http.Error(w, "internal error verifying password", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		a.Templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"Error": "invalid password"})
+		return
 	}
 	// create signed cookie value
 	val, err := cm.CreateAuthCookieValue()

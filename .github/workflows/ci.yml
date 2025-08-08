@@ -53,9 +53,6 @@ jobs:
         with:
           go-version: '1.24'
 
-      # Node/npm/pnpm removed from repository; build CSS uses committed fallback stylesheet
-      # Build step will copy the committed fallback CSS via Makefile's build-css target.
-
       - name: Run Go tests
         run: go test ./...
 
@@ -66,19 +63,6 @@ jobs:
             echo "DOCKER_TAGS=ghcr.io/lkshrk/gpg-web:${TAG},ghcr.io/lkshrk/gpg-web:latest" >> $GITHUB_ENV
           else
             echo "DOCKER_TAGS=ghcr.io/lkshrk/gpg-web:latest,ghcr.io/lkshrk/gpg-web:${GITHUB_SHA}" >> $GITHUB_ENV
-          fi
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install frontend deps & build CSS
-        run: |
-          if [ -f package.json ]; then
-            npm ci
-            npm run build:css
-          else
-            echo "no package.json, skipping css build"
           fi
 
       - name: Build container image (no push)

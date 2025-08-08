@@ -1,20 +1,27 @@
 package crypto_test
 
 import (
-	"encoding/base64"
 	"os"
 	"testing"
 
+	_ "github.com/glebarez/sqlite"
+	"github.com/jmoiron/sqlx"
+
 	c "h-cloud.io/web-gpg/internal/crypto"
+	dbpkg "h-cloud.io/web-gpg/internal/db"
 )
 
 func TestEncryptDecrypt(t *testing.T) {
-	// set MASTER_KEY for test
-	raw := make([]byte, 32)
-	for i := range raw {
-		raw[i] = byte(i + 1)
+	// set MASTER_PASSWORD and in-memory sqlite DB for salt storage
+	os.Setenv("MASTER_PASSWORD", "test-master-password")
+	db, err := sqlx.Open("sqlite", "file::memory:?mode=memory&cache=shared")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
 	}
-	os.Setenv("MASTER_KEY", base64.StdEncoding.EncodeToString(raw))
+	if err := dbpkg.ApplySQLMigrations(db, "../../migrations/sql"); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	c.SetDB(db)
 
 	plaintext := []byte("super secret")
 	enc, err := c.Encrypt(plaintext)

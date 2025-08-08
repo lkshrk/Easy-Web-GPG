@@ -1,44 +1,91 @@
-# Web-GPG
+# gpg_web
 
-A minimal web app for encrypting and decrypting text with PGP keys.
+Lightweight web UI for managing OpenPGP keys and encrypting/decrypting small blobs.
 
-![screenshot](./.github/screenshot.svg)
+This project provides:
 
-Quick run
+- A minimal Tailwind-styled web interface.
+- Master-password gated access with HMAC-signed cookies (24h).
+- AES-encrypted, recoverable passphrase storage encrypted with a key derived from `MASTER_PASSWORD`.
 
+Quick links
 
-Database
+- Server entrypoint: `./cmd/gpgweb`
+- Templates: `templates/`
+- Static assets: `static/` (Tailwind CLI build outputs to `static/dist`)
 
-- By default the app uses a local SQLite file (`data.db`).
-- To use Postgres, set `DATABASE_URL` to your Postgres connection string (the app will use the `pgx` driver when `DATABASE_URL` is present).
-- Run the published image (recommended):
+Requirements
 
-  ```bash
-  docker run --rm -p 8080:8080 lkshrk/gpg-web:latest
-  ```
+- Go 1.20+ to build the server
+- Node.js + npm (only required to build the Tailwind CSS asset locally)
 
-- Or run locally:
+Environment
 
-  ```bash
-  go run .
-  ```
+The app is configured with environment variables. Example values and purpose:
 
-Usage (brief)
+| Variable | Required | Description |
+|---|:---:|---|
+| `MASTER_PASSWORD` | yes | Plaintext master password used to derive the 32-byte master key via Argon2id. A random salt is persisted into the application's database (table `secrets`, name `master_salt`) on first run. Back up your database to preserve the salt and allow recovery of encrypted passphrases. |
+| `DATABASE_URL` | optional | If set (e.g. Postgres), runtime runs migrations against it. Otherwise the app uses a local sqlite file for convenience. |
+| `PORT` | optional | HTTP port (default: `8080`). |
+| `ARGON2_TIME` | optional | Argon2id time parameter (default `1`). |
+| `ARGON2_MEMORY_KB` | optional | Argon2id memory in KB (default `32768`). |
+| `ARGON2_THREADS` | optional | Argon2id threads (default `2`). |
+| `FORCE_SECURE_COOKIES` | optional | When set to `1`, cookies will be marked `Secure` (useful behind HTTPS). |
 
-- Add a key: give it a name, paste an ASCII-armored public or private key, optionally provide the passphrase (stored encrypted if `MASTER_KEY` is set).
-- Encrypt: choose a public key, paste plaintext, click Encrypt to get an armored message.
-- Decrypt: choose a private key (with unlocked or stored passphrase), paste armored message, click Decrypt to recover plaintext.
+Tip: the app derives a 32-byte key from `MASTER_PASSWORD` using Argon2id and a persisted salt stored in the application database (table `secrets`, name `master_salt`). You only need to set `MASTER_PASSWORD`; the app will create the salt on first run and store it in the DB. Back up your DB to preserve the salt.
 
-Security
+Quick start (development)
 
-- Keys and any stored passphrases are stored in the local SQLite DB. Do not add private keys or passphrases to public/shared deployments unless you understand and mitigate the risks.
+1. Build Tailwind CSS (optional locally):
 
-Build / Develop
+```bash
+npm ci
+npm run build:css
+```
 
-- Build: `go build ./cmd/gpgweb && ./gpgweb`
-- Tests: `go test ./...`
-- Formatting: `gofmt -w .`
+2. Run the server locally:
 
-Contact / Contribute
+```bash
+export MASTER_PASSWORD='your-secret-password'
+GOCACHE=$(pwd)/.gocache go run ./cmd/gpgweb
+```
 
-- Open issues and PRs against `main`.
+Run tests
+
+```bash
+GOCACHE=$(pwd)/.gocache go test ./...
+```
+
+Docker
+
+Build and run the container (the image build will include the Go binary and templates). Ensure the CSS is built (CI or local) so `static/dist/styles.css` exists.
+
+```bash
+# build CSS locally if needed
+npm ci
+npm run build:css
+
+docker build -t gpgweb:local .
+
+docker run --rm -p 8080:8080   -e MASTER_PASSWORD='your-secret-password'   gpgweb:local
+```
+
+CI
+
+The repository may include a GitHub Actions workflow that runs tests and builds the image on every push; publishing to a registry should be gated to runs on `main` or tags. Ensure the workflow builds the CSS before building the image.
+
+Security notes
+
+- Keep `MASTER_PASSWORD` secret; the derived key (via Argon2id + salt) is used to encrypt stored passphrases and sign auth cookies.
+- The salt is stored in the DB under `secrets.name = 'master_salt'`. Back up your DB so you can recover encrypted data after restores.
+- Prefer using a secrets manager to supply `MASTER_PASSWORD` in production; avoid committing plaintext credentials.
+- For production, run behind HTTPS and set `FORCE_SECURE_COOKIES=1` so auth cookies are marked `Secure`.
+
+Contributing
+
+Contributions are welcome. Open an issue or pull request with proposed changes. If you change the database schema, add a migration in `migrations/sql`.
+
+License
+
+This project is provided as-is. See the repository for license details.

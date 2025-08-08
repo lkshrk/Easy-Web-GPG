@@ -24,7 +24,11 @@ func RunMigrations() error {
 		dbURL = "sqlite3://file:" + dbPath + "?_foreign_keys=1"
 	}
 
+	// prefer absolute path if present (useful in container runtime where files are at /migrations/sql)
 	src := "file://migrations/sql"
+	if _, err := os.Stat("/migrations/sql"); err == nil {
+		src = "file:///migrations/sql"
+	}
 
 	m, err := migrate.New(src, dbURL)
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	fmt.Println("MASTER_KEY env set:", os.Getenv("MASTER_KEY") != "")
+	fmt.Println("MASTER_PASSWORD env set:", os.Getenv("MASTER_PASSWORD") != "")
 	s, err := cm.Encrypt([]byte("pass"))
 	if err != nil {
 		fmt.Println("encrypt err:", err)

@@ -1,5 +1,5 @@
 ### Multi-stage Dockerfile
-### Stage: build Go binary and embed static assets (expecting static/dist to be present in context)
+### Stage: build Go binary and embed assets
 FROM golang:1.24-alpine AS go_builder
 WORKDIR /src
 
@@ -20,7 +20,7 @@ FROM gcr.io/distroless/static:nonroot
 COPY --from=go_builder /web-gpg /web-gpg
 # Copy templates, static assets and migrations into known absolute paths
 COPY --from=go_builder /src/templates /templates
-COPY --from=go_builder /src/static/dist /static/dist
+# static/dist is no longer produced by the build; skip copying it if absent
 COPY --from=go_builder /src/migrations/sql /migrations/sql
 
 EXPOSE 8080

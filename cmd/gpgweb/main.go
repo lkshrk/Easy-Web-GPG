@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"h-cloud.io/web-gpg/internal/app"
+	cm "h-cloud.io/web-gpg/internal/crypto"
 	dbpkg "h-cloud.io/web-gpg/internal/db"
 	migratepkg "h-cloud.io/web-gpg/internal/migrate"
 )
@@ -32,6 +33,9 @@ func main() {
 	if err := dbpkg.ApplySQLMigrations(db, "migrations/sql"); err != nil {
 		log.Printf("migration error (dev): %v", err)
 	}
+
+	// Provide DB to crypto package so it can store/read master salt
+	cm.SetDB(db)
 
 	// Resolve template path candidates
 	tplCandidates := []string{"templates/index.html", "./templates/index.html", "../templates/index.html", "../../templates/index.html", "/templates/index.html"}

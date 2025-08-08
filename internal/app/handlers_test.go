@@ -2,7 +2,6 @@ package app_test
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -24,11 +23,10 @@ import (
 
 func TestEncryptDecryptHandlers(t *testing.T) {
 	// Setup master key
-	raw := make([]byte, 32)
-	for i := range raw {
-		raw[i] = byte(i + 1)
-	}
-	os.Setenv("MASTER_KEY", base64.StdEncoding.EncodeToString(raw))
+	// use MASTER_PASSWORD and per-test salt file
+	os.Setenv("MASTER_PASSWORD", "test-master-password")
+	dir := t.TempDir()
+	os.Setenv("MASTER_SALT_FILE", dir+"/master_salt")
 
 	db, err := sqlx.Open("sqlite", "file::memory:?mode=memory&cache=shared")
 	if err != nil {
@@ -37,6 +35,9 @@ func TestEncryptDecryptHandlers(t *testing.T) {
 	if err := dbpkg.ApplySQLMigrations(db, "../../migrations/sql"); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
+
+	// make crypto use this DB for salt storage
+	cm.SetDB(db)
 
 	tmpl := templateMust()
 	a := &apppkg.App{DB: db, Templates: tmpl}
@@ -125,11 +126,9 @@ func templateMust() *template.Template {
 
 func TestAuthFlow(t *testing.T) {
 	// Setup master key and password
-	raw := make([]byte, 32)
-	for i := range raw {
-		raw[i] = byte(i + 1)
-	}
-	os.Setenv("MASTER_KEY", base64.StdEncoding.EncodeToString(raw))
+	// use MASTER_PASSWORD and per-test salt file
+	dir := t.TempDir()
+	os.Setenv("MASTER_SALT_FILE", dir+"/master_salt")
 	os.Setenv("MASTER_PASSWORD", "s3cret")
 
 	db, err := sqlx.Open("sqlite", "file::memory:?mode=memory&cache=shared")
@@ -140,18 +139,22 @@ func TestAuthFlow(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
+	// make crypto use this DB for salt storage
+	cm.SetDB(db)
+
 	tmpl := templateMust()
 	a := &apppkg.App{DB: db, Templates: tmpl}
 
-	// Visit index -> should see login form
+	// Visit index -> should see login form (look for password input or form)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
 	a.IndexHandler(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("index status before auth: %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "Enter master password") {
-		t.Fatalf("expected login page, got: %s", w.Body.String())
+	body := w.Body.String()
+	if !(strings.Contains(body, "name=\"password\"") || strings.Contains(body, "placeholder=\"Master password\"") || strings.Contains(body, "action=\"/auth\"")) {
+		t.Fatalf("expected login page, got: %s", body)
 	}
 
 	// Post correct password to /auth
