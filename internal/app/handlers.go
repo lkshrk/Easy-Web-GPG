@@ -10,6 +10,7 @@ import (
 
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 
 	cm "h-cloud.io/web-gpg/internal/crypto"
 	mm "h-cloud.io/web-gpg/internal/models"
@@ -72,6 +73,7 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var encrypted *string
+	var bcryptHash *string
 	if password != "" {
 		enc, err := cm.Encrypt([]byte(password))
 		if err != nil {
@@ -84,13 +86,18 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		encrypted = &enc
+		// additionally store bcrypt hash of the passphrase
+		if h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost); err == nil {
+			hs := string(h)
+			bcryptHash = &hs
+		}
 	}
 
 	// Try sqlite style first
-	_, err := a.DB.Exec("INSERT INTO keys (name, armored, is_private, encrypted_password, created_at) VALUES (?, ?, ?, ?, ?)", name, armored, isPrivate, encrypted, time.Now())
+	_, err := a.DB.Exec("INSERT INTO keys (name, armored, is_private, encrypted_password, password_bcrypt, created_at) VALUES (?, ?, ?, ?, ?, ?)", name, armored, isPrivate, encrypted, bcryptHash, time.Now())
 	if err != nil {
 		// try postgres param style
-		_, err = a.DB.Exec("INSERT INTO keys (name, armored, is_private, encrypted_password, created_at) VALUES ($1, $2, $3, $4, $5)", name, armored, isPrivate, encrypted, time.Now())
+		_, err = a.DB.Exec("INSERT INTO keys (name, armored, is_private, encrypted_password, password_bcrypt, created_at) VALUES ($1, $2, $3, $4, $5, $6)", name, armored, isPrivate, encrypted, bcryptHash, time.Now())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -303,16 +310,24 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 	pass := r.FormValue("password")
-	expected := os.Getenv("MASTER_PASSWORD")
-	if expected == "" {
-		http.Error(w, "server not configured for master password", http.StatusInternalServerError)
-		return
-	}
-	if pass != expected {
-		// render login with error
-		a.Templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"Error": "invalid password"})
-		return
+	// support hashed master password via MASTER_PASSWORD_BCRYPT, or fallback to plain MASTER_PASSWORD
+	if hash := os.Getenv("MASTER_PASSWORD_BCRYPT"); hash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(pass)); err != nil {
+			a.Templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"Error": "invalid password"})
+			return
+		}
+	} else {
+		expected := os.Getenv("MASTER_PASSWORD")
+		if expected == "" {
+			http.Error(w, "server not configured for master password", http.StatusInternalServerError)
+			return
+		}
+		if pass != expected {
+			a.Templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"Error": "invalid password"})
+			return
+		}
 	}
 	// create signed cookie value
 	val, err := cm.CreateAuthCookieValue()

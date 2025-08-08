@@ -29,11 +29,16 @@ test:
 
 # Build the Go binary for the current platform (native build)
 .PHONY: build
-build:
+build: css
 	@echo "Building native go binary -> $(BINARY)"
 	@mkdir -p $(BIN_DIR)
 	go build -trimpath -o $(BINARY) $(CMD)
 
+
+.PHONY: css
+css:
+	@echo "Building CSS with Tailwind CLI..."
+	@if [ -f package.json ]; then 		npm ci --silent || true; 		npm run build:css --silent; 	else 		echo "no package.json found, skipping css build"; 	fi
 
 # Run the app locally (builds then runs the binary)
 run: build

@@ -15,6 +15,7 @@ desktop.ini
 bin/
 *.exe
 *.out
+.gocache
 
 # Editors
 .vscode/
