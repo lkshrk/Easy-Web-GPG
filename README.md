@@ -2,9 +2,9 @@
 
 Lightweight web UI for encrypting/decrypting small PGP blobs.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/lkshrk/Easy-Web-GPG/ci/screenshot/.github/screenshot.png" alt="Easy Web GPG screenshot" width="900" />
-</p>
+<div align="center">
+  <img src="https://raw.githubusercontent.com/lkshrk/Easy-Web-GPG/ci/screenshot/.github/screenshot.png" alt="Easy Web GPG screenshot" style="max-width:900px;width:100%;height:auto;display:block;margin:0 auto;" />
+</div>
 
 This project provides:
 
