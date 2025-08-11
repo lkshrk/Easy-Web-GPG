@@ -1,5 +1,5 @@
 {
-  "name": "gpg-web-assets",
+  "name": "easy-web-gpg-assets",
   "private": true,
   "scripts": {
     "build:css": "tailwindcss -i ./static/css/input.css -o ./static/dist/styles.css --minify",

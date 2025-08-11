@@ -1,5 +1,5 @@
 # ==============================================================================
-# Docker Compose configuration for GPG Web Application
+# Docker Compose configuration for Easy Web GPG
 # ==============================================================================
 
 version: '3.8'
@@ -10,7 +10,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: gpg-web-app
+    container_name: easy-web-gpg-app
     ports:
       - "8080:8080"
     environment:
@@ -31,7 +31,7 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - gpg-web-network
+      - easy-web-gpg-network
 
   # Development service with volume mounts for live development
   app-dev:
@@ -39,7 +39,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: go_builder
-    container_name: gpg-web-dev
+    container_name: easy-web-gpg-dev
     ports:
       - "8080:8080"
     environment:
@@ -52,17 +52,17 @@ services:
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
     working_dir: /src
-    command: ["go", "run", "./cmd/gpgweb"]
+    command: ["go", "run", "./cmd/easywebgpg"]
     restart: unless-stopped
     networks:
-      - gpg-web-network
+      - easy-web-gpg-network
     profiles:
       - dev
 
   # CSS builder service for development
   css-watch:
     image: node:20-alpine
-    container_name: gpg-web-css
+    container_name: easy-web-gpg-css
     working_dir: /app
     volumes:
       - ./:/app
@@ -70,7 +70,7 @@ services:
     command: ["npm", "run", "watch:css"]
     restart: unless-stopped
     networks:
-      - gpg-web-network
+      - easy-web-gpg-network
     profiles:
       - dev
 
@@ -85,6 +85,6 @@ volumes:
 
 # Network configuration
 networks:
-  gpg-web-network:
+  easy-web-gpg-network:
     driver: bridge
-    name: gpg-web-network
+    name: easy-web-gpg-network

@@ -75,9 +75,9 @@ jobs:
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAG=${GITHUB_REF#refs/tags/}
-            echo "DOCKER_TAGS=ghcr.io/lkshrk/gpg-web:${TAG},ghcr.io/lkshrk/gpg-web:latest" >> $GITHUB_ENV
+            echo "DOCKER_TAGS=ghcr.io/lkshrk/easy-web-gpg:${TAG},ghcr.io/lkshrk/easy-web-gpg:latest" >> $GITHUB_ENV
           else
-            echo "DOCKER_TAGS=ghcr.io/lkshrk/gpg-web:latest,ghcr.io/lkshrk/gpg-web:${GITHUB_SHA}" >> $GITHUB_ENV
+            echo "DOCKER_TAGS=ghcr.io/lkshrk/easy-web-gpg:latest,ghcr.io/lkshrk/easy-web-gpg:${GITHUB_SHA}" >> $GITHUB_ENV
           fi
 
       - name: Log in to Container Registry

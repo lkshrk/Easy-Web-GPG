@@ -1,5 +1,5 @@
 # ==============================================================================
-# GPG Web Application Makefile
+# Easy Web GPG Makefile
 # ==============================================================================
 
 # Variables
@@ -8,8 +8,8 @@ GOCACHE := $(CURDIR)/.gocache
 export GOCACHE
 
 # Binary and build configuration
-BINARY := bin/web-gpg
-CMD := ./cmd/gpgweb
+BINARY := bin/easy-web-gpg
+CMD := ./cmd/easywebgpg
 BIN_DIR := $(dir $(BINARY))
 BUILD_FLAGS := -trimpath -ldflags="-s -w"
 
@@ -38,7 +38,7 @@ NC := \033[0m # No Color
 .PHONY: help
 
 help: ## Show this help message
-	@echo "$(BLUE)GPG Web Application$(NC)"
+	@echo "$(BLUE)Easy Web GPG$(NC)"
 	@echo "$(BLUE)====================$(NC)"
 	@echo ""
 	@echo "$(GREEN)Build Targets:$(NC)"
@@ -175,16 +175,16 @@ dev: ## Start development environment (CSS watch + server)
 
 docker-build: ## Build Docker image
 	@echo "$(BLUE)Building Docker image...$(NC)"
-	@docker build -t gpg-web:latest .
+	@docker build -t easy-web-gpg:latest .
 	@echo "$(GREEN)✓ Docker image built$(NC)"
 
 docker-run: docker-build ## Build and run Docker container
 	@echo "$(BLUE)Starting Docker container...$(NC)"
 	@docker run -d \
-		--name gpg-web-container \
+		--name easy-web-gpg-container \
 		-p 8080:8080 \
 		-e MASTER_KEY=$$MASTER_KEY \
-		gpg-web:latest
+		easy-web-gpg:latest
 	@echo "$(GREEN)✓ Container started on http://localhost:8080$(NC)"
 
 docker-dev: ## Start development environment with Docker Compose
@@ -194,17 +194,17 @@ docker-dev: ## Start development environment with Docker Compose
 
 docker-stop: ## Stop and remove Docker containers
 	@echo "$(BLUE)Stopping Docker containers...$(NC)"
-	@docker stop gpg-web-container 2>/dev/null || true
-	@docker rm gpg-web-container 2>/dev/null || true
+	@docker stop easy-web-gpg-container 2>/dev/null || true
+	@docker rm easy-web-gpg-container 2>/dev/null || true
 	@docker-compose down 2>/dev/null || true
 	@echo "$(GREEN)✓ Containers stopped$(NC)"
 
 docker-logs: ## Show Docker container logs
-	@docker logs gpg-web-container 2>/dev/null || docker-compose logs
+	@docker logs easy-web-gpg-container 2>/dev/null || docker-compose logs
 
 docker-clean: docker-stop ## Clean Docker images and containers
 	@echo "$(BLUE)Cleaning Docker artifacts...$(NC)"
-	@docker rmi gpg-web:latest 2>/dev/null || true
+	@docker rmi easy-web-gpg:latest 2>/dev/null || true
 	@docker system prune -f
 	@echo "$(GREEN)✓ Docker artifacts cleaned$(NC)"
 

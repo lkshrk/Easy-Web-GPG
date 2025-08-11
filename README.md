@@ -1,6 +1,6 @@
-# gpg_web
+# Easy Web GPG
 
-Lightweight web UI for managing OpenPGP keys and encrypting/decrypting small blobs.
+Lightweight web UI for encrypting/decrypting small PGP blobs.
 
 This project provides:
 
@@ -10,7 +10,7 @@ This project provides:
 
 Quick links
 
-- Server entrypoint: `./cmd/gpgweb`
+- Server entrypoint: `./cmd/easywebgpg`
 - Templates: `templates/`
 - Static assets: `static/` (Tailwind CLI build outputs to `static/dist`)
 
@@ -48,7 +48,7 @@ npm run build:css
 
 ```bash
 export MASTER_PASSWORD='your-secret-password'
-GOCACHE=$(pwd)/.gocache go run ./cmd/gpgweb
+GOCACHE=$(pwd)/.gocache go run ./cmd/easywebgpg
 ```
 
 Run tests
@@ -66,9 +66,9 @@ Build and run the container (the image build will include the Go binary and temp
 npm ci
 npm run build:css
 
-docker build -t gpgweb:local .
+docker build -t easy-web-gpg:local .
 
-docker run --rm -p 8080:8080   -e MASTER_PASSWORD='your-secret-password'   gpgweb:local
+docker run --rm -p 8080:8080   -e MASTER_PASSWORD='your-secret-password'   easy-web-gpg:local
 ```
 
 CI

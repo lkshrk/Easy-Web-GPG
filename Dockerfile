@@ -1,5 +1,5 @@
 # ==============================================================================
-# Multi-stage Dockerfile for GPG Web Application
+# Multi-stage Dockerfile for Easy Web GPG
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -57,8 +57,8 @@ ENV CGO_ENABLED=0 \
 RUN go build \
   -ldflags="-s -w -extldflags '-static'" \
   -trimpath \
-  -o /web-gpg \
-  ./cmd/gpgweb
+  -o /easy-web-gpg \
+  ./cmd/easywebgpg
 
 # Verify the binary
 RUN ls -l /easy-web-gpg && echo "Binary built successfully"
@@ -69,12 +69,12 @@ RUN ls -l /easy-web-gpg && echo "Binary built successfully"
 FROM gcr.io/distroless/static:nonroot
 
 # Add labels for better container management
-LABEL maintainer="GPG Web Team" \
-  description="Lightweight web UI for managing OpenPGP keys" \
+LABEL maintainer="lkshrk" \
+  description="Easy Web GPG - Lightweight web UI for de-/encrypting PGP blobs" \
   version="1.0"
 
 # Copy the binary from builder stage
-COPY --from=go_builder /web-gpg /web-gpg
+COPY --from=go_builder /easy-web-gpg /easy-web-gpg
 
 # Copy application assets and templates
 COPY --from=go_builder /src/templates/ /templates/
@@ -87,4 +87,4 @@ EXPOSE 8080
 
 
 # Set the entrypoint
-ENTRYPOINT ["/web-gpg"]
+ENTRYPOINT ["/easy-web-gpg"]
