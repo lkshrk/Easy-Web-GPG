@@ -21,34 +21,54 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Regenerate screenshot
+      - name: Regenerate screenshot (live render)
         run: |
           set -e
-          if [ -f .github/screenshot.svg ]; then
-            sudo apt-get update -y
+          # Install chromium for headless screenshots
+          sudo apt-get update -y
+          sudo apt-get install -y chromium-browser --no-install-recommends >/dev/null
+
+          # Build CSS and binary
+          make css
+          make build
+
+          # Run the server in background on port 8080
+          MASTER_PASSWORD="" PORT=8080 ./bin/easy-web-gpg &> /tmp/webgpg.log &
+          PID=$!
+          # Give server time to boot
+          sleep 2
+
+          # Use headless chromium to screenshot (window size 1200x800)
+          CHROME="/usr/bin/chromium-browser"
+          if [ ! -x "$CHROME" ]; then
+            CHROME="$(which chromium || which chromium-browser || true)"
+          fi
+          if [ -z "$CHROME" ]; then
+            echo "chromium not found; falling back to SVG conversion"
             sudo apt-get install -y librsvg2-bin >/dev/null
-            # render PNG from SVG (1200x800)
             rsvg-convert -w 1200 -h 800 .github/screenshot.svg -o .github/screenshot.png || true
           else
-            echo "no svg to render"
+            $CHROME --headless --disable-gpu --no-sandbox --window-size=1200,800               --screenshot=.github/screenshot.png "http://127.0.0.1:8080" || true
           fi
-          # commit and push only for branch/tag runs (not for forked PRs)
+
+          # stop server
+          kill $PID || true
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .github/screenshot.png || true
-          # Use a dedicated branch for screenshot updates to avoid racing with pushes to main
           TARGET_BRANCH="ci/screenshot"
           if git diff --staged --quiet; then
             echo "screenshot unchanged"
           else
             if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
               git commit -m "ci: regenerate screenshot"
-              # Force update the dedicated branch safely
               git push --force-with-lease origin "HEAD:${TARGET_BRANCH}"
             else
               echo "Pull request build; not pushing screenshot changes"
             fi
           fi
+
 
       - name: Set up Go
         uses: actions/setup-go@v4
