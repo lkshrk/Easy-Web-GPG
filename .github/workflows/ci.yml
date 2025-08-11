@@ -36,13 +36,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .github/screenshot.png || true
-          BRANCH="${GITHUB_REF#refs/heads/}"
+          # Use a dedicated branch for screenshot updates to avoid racing with pushes to main
+          TARGET_BRANCH="ci/screenshot"
           if git diff --staged --quiet; then
             echo "screenshot unchanged"
           else
             if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
               git commit -m "ci: regenerate screenshot"
-              git push origin "HEAD:${BRANCH}"
+              # Force update the dedicated branch safely
+              git push --force-with-lease origin "HEAD:${TARGET_BRANCH}"
             else
               echo "Pull request build; not pushing screenshot changes"
             fi
