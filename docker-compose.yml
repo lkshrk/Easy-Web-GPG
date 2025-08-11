@@ -1,0 +1,90 @@
+# ==============================================================================
+# Docker Compose configuration for GPG Web Application
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gpg-web-app
+    ports:
+      - "8080:8080"
+    environment:
+      - MASTER_KEY=${MASTER_KEY:-your-master-key-here}
+      - ENV=development
+    volumes:
+      # Mount database directory for persistence
+      - ./data:/data
+      # Mount templates for hot reloading in development
+      - ./templates:/templates:ro
+      # Mount static assets
+      - ./static:/static:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/time"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - gpg-web-network
+
+  # Development service with volume mounts for live development
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: go_builder
+    container_name: gpg-web-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - MASTER_KEY=${MASTER_KEY:-dev-master-key}
+      - ENV=development
+      - CGO_ENABLED=0
+    volumes:
+      # Mount source code for live development
+      - ./:/src
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    working_dir: /src
+    command: ["go", "run", "./cmd/gpgweb"]
+    restart: unless-stopped
+    networks:
+      - gpg-web-network
+    profiles:
+      - dev
+
+  # CSS builder service for development
+  css-watch:
+    image: node:20-alpine
+    container_name: gpg-web-css
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - node-modules-cache:/app/node_modules
+    command: ["npm", "run", "watch:css"]
+    restart: unless-stopped
+    networks:
+      - gpg-web-network
+    profiles:
+      - dev
+
+# Named volumes for caching
+volumes:
+  go-mod-cache:
+    driver: local
+  go-build-cache:
+    driver: local
+  node-modules-cache:
+    driver: local
+
+# Network configuration
+networks:
+  gpg-web-network:
+    driver: bridge
+    name: gpg-web-network

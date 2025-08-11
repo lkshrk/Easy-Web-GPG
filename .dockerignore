@@ -1,0 +1,106 @@
+# ==============================================================================
+# Docker ignore file for GPG Web Application
+# ==============================================================================
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+CONTRIBUTING.md
+LICENSE
+*.md
+
+# Development tools and configurations
+.vscode/
+.idea/
+*.iml
+.zed/
+.devcontainer/
+
+# Editor temporary files
+*.swp
+*.swo
+*~
+.#*
+
+# Operating system files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Build artifacts and generated files
+bin/
+static/dist/
+coverage.out
+coverage.html
+*.log
+*.tmp
+*.pid
+*.sock
+
+# Go build cache
+.gocache/
+*.exe
+*.out
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and local configuration
+.env
+.env.local
+.env.*.local
+
+# Database files
+data.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Test files (not needed in production image)
+*_test.go
+testdata/
+test/
+tests/
+__tests__/
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Docker files (don't need these inside the container)
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# Makefile (not needed in runtime)
+Makefile
+
+# Temporary directories
+tmp/
+temp/
+.tmp/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# IDE and development artifacts
+.nyc_output/
+coverage/
+.cache/
+.parcel-cache/
+
+# OS specific
+**/.DS_Store
+**/Thumbs.db

@@ -10,6 +10,11 @@ desktop.ini
 *~
 
 # Build output
+static/dist/
+coverage.out
+coverage.html
+*.log
+*.tmp
 
 # Go
 bin/
@@ -34,3 +39,7 @@ bin/
 
 data.db
 node_modules/
+
+# Temporary files
+*.pid
+*.sock
