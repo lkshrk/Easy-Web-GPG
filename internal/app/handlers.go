@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"html"
 	"html/template"
 	"net/http"
 	"os"
@@ -20,6 +21,18 @@ import (
 type App struct {
 	DB        *sqlx.DB
 	Templates *template.Template
+}
+
+// sendHTMXError returns true if an HTMX error fragment was written.
+func sendHTMXError(w http.ResponseWriter, r *http.Request, id, msg string, status int) bool {
+	if r.Header.Get("HX-Request") == "" {
+		return false
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	// out-of-band swap target; escape message
+	fmt.Fprintf(w, `<div id="%s" role="alert" aria-live="assertive" tabindex="-1" hx-swap-oob="true" class="p-2 border rounded bg-rose-50 text-rose-700">%s</div>`, id, html.EscapeString(msg))
+	return true
 }
 
 func (a *App) IndexHandler(w http.ResponseWriter, r *http.Request) {
@@ -122,29 +135,44 @@ func (a *App) EncryptHandler(w http.ResponseWriter, r *http.Request) {
 	var k mm.Key
 	if err := a.DB.Get(&k, "SELECT id, name, armored, is_private, encrypted_password FROM keys WHERE id = ?", keyID); err != nil {
 		if err := a.DB.Get(&k, "SELECT id, name, armored, is_private, encrypted_password FROM keys WHERE id = $1", keyID); err != nil {
-			http.Error(w, "key not found", http.StatusBadRequest)
+			if sendHTMXError(w, r, "encrypt-error", "key not found", http.StatusUnprocessableEntity) {
+				return
+			}
+			http.Error(w, "key not found", http.StatusUnprocessableEntity)
 			return
 		}
 	}
 
 	kp, err := crypto.NewKeyFromArmored(k.Armored)
 	if err != nil {
-		http.Error(w, "invalid key", http.StatusBadRequest)
+		if sendHTMXError(w, r, "encrypt-error", "invalid key", http.StatusUnprocessableEntity) {
+			return
+		}
+		http.Error(w, "invalid key", http.StatusUnprocessableEntity)
 		return
 	}
 	pub, err := kp.GetArmoredPublicKey()
 	if err != nil {
+		if sendHTMXError(w, r, "encrypt-error", "failed to get public key", http.StatusInternalServerError) {
+			return
+		}
 		http.Error(w, "failed to get public key", http.StatusInternalServerError)
 		return
 	}
 	pubKeyObj, err := crypto.NewKeyFromArmored(pub)
 	if err != nil {
+		if sendHTMXError(w, r, "encrypt-error", "failed to parse public key", http.StatusInternalServerError) {
+			return
+		}
 		http.Error(w, "failed to parse public key", http.StatusInternalServerError)
 		return
 	}
 
 	recipientKR, err := crypto.NewKeyRing(pubKeyObj)
 	if err != nil {
+		if sendHTMXError(w, r, "encrypt-error", "failed to create keyring", http.StatusInternalServerError) {
+			return
+		}
 		http.Error(w, "failed to create keyring", http.StatusInternalServerError)
 		return
 	}
@@ -152,12 +180,18 @@ func (a *App) EncryptHandler(w http.ResponseWriter, r *http.Request) {
 	message := crypto.NewPlainMessageFromString(plaintext)
 	pgpMsg, err := recipientKR.Encrypt(message, nil)
 	if err != nil {
+		if sendHTMXError(w, r, "encrypt-error", err.Error(), http.StatusInternalServerError) {
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	armored, err := pgpMsg.GetArmored()
 	if err != nil {
+		if sendHTMXError(w, r, "encrypt-error", "failed to armor message", http.StatusInternalServerError) {
+			return
+		}
 		http.Error(w, "failed to armor message", http.StatusInternalServerError)
 		return
 	}
@@ -183,24 +217,36 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 	var k mm.Key
 	if err := a.DB.Get(&k, "SELECT id, name, armored, is_private, encrypted_password FROM keys WHERE id = ?", keyID); err != nil {
 		if err := a.DB.Get(&k, "SELECT id, name, armored, is_private, encrypted_password FROM keys WHERE id = $1", keyID); err != nil {
-			http.Error(w, "key not found", http.StatusBadRequest)
+			if sendHTMXError(w, r, "decrypt-error", "key not found", http.StatusUnprocessableEntity) {
+				return
+			}
+			http.Error(w, "key not found", http.StatusUnprocessableEntity)
 			return
 		}
 	}
 
 	if !k.IsPrivate {
-		http.Error(w, "selected key is not a private key", http.StatusBadRequest)
+		if sendHTMXError(w, r, "decrypt-error", "selected key is not a private key", http.StatusUnprocessableEntity) {
+			return
+		}
+		http.Error(w, "selected key is not a private key", http.StatusUnprocessableEntity)
 		return
 	}
 
 	priv, err := crypto.NewKeyFromArmored(k.Armored)
 	if err != nil {
-		http.Error(w, "invalid private key", http.StatusBadRequest)
+		if sendHTMXError(w, r, "decrypt-error", "invalid private key", http.StatusUnprocessableEntity) {
+			return
+		}
+		http.Error(w, "invalid private key", http.StatusUnprocessableEntity)
 		return
 	}
 
 	locked, err := priv.IsLocked()
 	if err != nil {
+		if sendHTMXError(w, r, "decrypt-error", "failed to inspect private key", http.StatusInternalServerError) {
+			return
+		}
 		http.Error(w, "failed to inspect private key", http.StatusInternalServerError)
 		return
 	}
@@ -210,17 +256,26 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 		if k.EncryptedPasshex != nil && *k.EncryptedPasshex != "" {
 			pwBytes, err := cm.Decrypt(*k.EncryptedPasshex)
 			if err != nil {
+				if sendHTMXError(w, r, "decrypt-error", "failed to decrypt stored password", http.StatusInternalServerError) {
+					return
+				}
 				http.Error(w, "failed to decrypt stored password", http.StatusInternalServerError)
 				return
 			}
 			unlocked, err := priv.Unlock(pwBytes)
 			if err != nil {
-				http.Error(w, "failed to unlock private key with stored password", http.StatusBadRequest)
+				if sendHTMXError(w, r, "decrypt-error", "failed to unlock private key with stored password", http.StatusUnprocessableEntity) {
+					return
+				}
+				http.Error(w, "failed to unlock private key with stored password", http.StatusUnprocessableEntity)
 				return
 			}
 			keyToUse = unlocked
 		} else {
-			http.Error(w, "private key is password protected; no stored password", http.StatusBadRequest)
+			if sendHTMXError(w, r, "decrypt-error", "private key is password protected; no stored password", http.StatusUnprocessableEntity) {
+				return
+			}
+			http.Error(w, "private key is password protected; no stored password", http.StatusUnprocessableEntity)
 			return
 		}
 	} else {
@@ -229,18 +284,27 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 
 	kr, err := crypto.NewKeyRing(keyToUse)
 	if err != nil {
+		if sendHTMXError(w, r, "decrypt-error", "failed to create keyring", http.StatusInternalServerError) {
+			return
+		}
 		http.Error(w, "failed to create keyring", http.StatusInternalServerError)
 		return
 	}
 
 	encMessage, err := crypto.NewPGPMessageFromArmored(input)
 	if err != nil {
-		http.Error(w, "invalid armored message", http.StatusBadRequest)
+		if sendHTMXError(w, r, "decrypt-error", "invalid armored message", http.StatusUnprocessableEntity) {
+			return
+		}
+		http.Error(w, "invalid armored message", http.StatusUnprocessableEntity)
 		return
 	}
 
 	decrypted, err := kr.Decrypt(encMessage, nil, 0)
 	if err != nil {
+		if sendHTMXError(w, r, "decrypt-error", fmt.Sprintf("decrypt error: %v", err), http.StatusInternalServerError) {
+			return
+		}
 		http.Error(w, fmt.Sprintf("decrypt error: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -259,7 +323,7 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 func (a *App) ViewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "missing id", http.StatusBadRequest)
+		http.Error(w, "missing id", http.StatusUnprocessableEntity)
 		return
 	}
 	var k mm.Key
@@ -294,7 +358,7 @@ func (a *App) DeleteKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.FormValue("id")
 	if id == "" {
-		http.Error(w, "missing id", http.StatusBadRequest)
+		http.Error(w, "missing id", http.StatusUnprocessableEntity)
 		return
 	}
 	// Try sqlite param style first

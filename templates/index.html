@@ -40,17 +40,24 @@
       <section class="mb-6 px-6">
         <h2 class="font-medium mb-2">Encrypt / Decrypt</h2>
         <div class="grid grid-cols-2 gap-4">
-          <form hx-post="/encrypt" hx-swap="outerHTML" hx-target="#encrypt-result" method="post" class="space-y-4">
-            <h3 class="text-sm font-semibold">Encrypt</h3>
+          <form hx-post="/encrypt" hx-swap="outerHTML" hx-target="#encrypt-result" method="post" class="space-y-4"
+                role="form" aria-labelledby="encrypt-heading" aria-describedby="encrypt-desc encrypt-error">
+            <h3 id="encrypt-heading" class="text-sm font-semibold">Encrypt</h3>
+            <p id="encrypt-desc" class="sr-only">Encrypt a message to the selected recipient. Use the search box to find a recipient.</p>
+            <div id="encrypt-error" role="alert" aria-live="assertive" class="sr-only"></div>
             <div>
               <label class="block text-sm">Key</label>
-              <select name="key" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                {{range .Keys}}
-                {{if not .IsPrivate}}
-                <option value="{{.ID}}">{{.Name}}</option>
-                {{end}}
-                {{end}}
-              </select>
+              <div class="relative">
+                <input id="key-search" type="text" placeholder="Search recipient..." autocomplete="off"
+                  role="combobox" aria-autocomplete="list" aria-controls="key-list" aria-expanded="false" aria-haspopup="listbox" aria-activedescendant=""
+  
+                  class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" aria-describedby="key-desc key-error" />
+                <input type="hidden" name="key" id="key-input" />
+                <p id="key-desc" class="sr-only">Type to filter recipient list. Use arrow keys to navigate and Enter to select.</p>
+                <div id="key-error" role="alert" aria-live="assertive" class="sr-only"></div>
+                <div id="key-list" role="listbox" aria-label="Recipient keys"
+                  class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-md max-h-48 overflow-auto hidden"></div>
+              </div>
             </div>
             <div>
               <label class="block text-sm">Plaintext</label>
@@ -63,8 +70,11 @@
 
           <div id="encrypt-result" class="col-span-1"></div>
 
-          <form hx-post="/decrypt" hx-swap="outerHTML" hx-target="#decrypt-result" method="post" class="space-y-4">
-            <h3 class="text-sm font-semibold">Decrypt</h3>
+          <form hx-post="/decrypt" hx-swap="outerHTML" hx-target="#decrypt-result" method="post" class="space-y-4"
+                role="form" aria-labelledby="decrypt-heading" aria-describedby="decrypt-desc decrypt-error">
+            <h3 id="decrypt-heading" class="text-sm font-semibold">Decrypt</h3>
+            <p id="decrypt-desc" class="sr-only">Decrypt an armored message using a stored private key.</p>
+            <div id="decrypt-error" role="alert" aria-live="assertive" class="sr-only"></div>
             <div>
               <label class="block text-sm">Key</label>
               <select name="key" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
@@ -113,5 +123,110 @@
         </div>
       </section>
     </main>
-  </body>
+    </body>
+  <script>
+    (function(){
+      // Build list HTML from server-rendered keys
+      const keyListEl = document.getElementById('key-list');
+      const searchEl = document.getElementById('key-search');
+      const inputEl = document.getElementById('key-input');
+      if (!keyListEl || !searchEl || !inputEl) return;
+
+      // Populate the list from template-driven data (render options invisibly)
+      const keys = [];
+      // Inline the keys from the server-side template
+      // The following block is reconstructed from the same data used above
+      keyListEl.innerHTML = `
+        {{range .Keys}}{{if not .IsPrivate}}<div class="px-3 py-2 hover:bg-slate-100 cursor-pointer" data-id="{{.ID}}">{{.Name}}</div>{{end}}{{end}}
+      `;
+
+      function showList(){ keyListEl.classList.remove('hidden'); }
+      function hideList(){ keyListEl.classList.add('hidden'); highlightIndex = -1; }
+
+      // Tracks visible items and highlighted index for keyboard nav
+      let highlightIndex = -1;
+      function refreshItems(){
+        allItems = Array.from(keyListEl.children).filter(el => el.style.display !== 'none');
+        allItems.forEach((el,i)=> el.classList.toggle('bg-indigo-50', i===highlightIndex));
+      }
+
+      searchEl.addEventListener('focus', function(){ showList(); refreshItems(); });
+      searchEl.addEventListener('input', function(){
+        const q = this.value.toLowerCase();
+        for(const el of keyListEl.children){
+          if(el.textContent.toLowerCase().indexOf(q) !== -1){ el.style.display = ''; } else { el.style.display = 'none' }
+        }
+        // reset highlight
+        highlightIndex = -1;
+        refreshItems();
+        // show/hide list
+        const any = Array.from(keyListEl.children).some(c => c.style.display !== 'none');
+        if(any) showList(); else hideList();
+      });
+
+      // keyboard navigation
+      let allItems = Array.from(keyListEl.children);
+      searchEl.addEventListener('keydown', function(e){
+        allItems = Array.from(keyListEl.children).filter(el => el.style.display !== 'none');
+        if(e.key === 'ArrowDown'){
+          e.preventDefault();
+          if(highlightIndex < allItems.length - 1) highlightIndex++;
+          if(highlightIndex < 0 && allItems.length) highlightIndex = 0;
+          refreshItems();
+          if(allItems[highlightIndex]) allItems[highlightIndex].scrollIntoView({block:'nearest'});
+        } else if(e.key === 'ArrowUp'){
+          e.preventDefault();
+          if(highlightIndex > 0) highlightIndex--; else highlightIndex = 0;
+          refreshItems();
+          if(allItems[highlightIndex]) allItems[highlightIndex].scrollIntoView({block:'nearest'});
+        } else if(e.key === 'Enter'){
+          if(highlightIndex >= 0 && allItems[highlightIndex]){
+            const t = allItems[highlightIndex];
+            inputEl.value = t.getAttribute('data-id');
+            searchEl.value = t.textContent.trim();
+            hideList();
+            e.preventDefault();
+          }
+        } else if(e.key === 'Escape'){
+          hideList();
+        }
+      });
+
+      // mouse interactions
+      keyListEl.addEventListener('mouseover', function(ev){
+        const t = ev.target.closest('[data-id]');
+        if(!t) return;
+        allItems = Array.from(keyListEl.children).filter(el => el.style.display !== 'none');
+        highlightIndex = allItems.indexOf(t);
+        refreshItems();
+      });
+
+      keyListEl.addEventListener('click', function(ev){
+        const t = ev.target.closest('[data-id]');
+        if(!t) return;
+        const id = t.getAttribute('data-id');
+        const name = t.textContent.trim();
+        inputEl.value = id;
+        searchEl.value = name;
+        hideList();
+      });
+
+      document.addEventListener('click', function(ev){
+        if(!ev.target.closest('#key-list') && !ev.target.closest('#key-search')){
+          hideList();
+        }
+      });
+    })();
+  </script>
+<  </script>
+  <script>
+    // Focus error alerts after HTMX swaps them into the DOM so screen readers notice
+    document.body.addEventListener('htmx:afterOnLoad', function(evt){
+      // prefer encrypt error if present
+      var el = document.getElementById('encrypt-error') || document.getElementById('decrypt-error');
+      if(el){
+        try{ el.focus(); }catch(e){}
+      }
+    });
+  </script>
 </html>
