@@ -44,40 +44,53 @@ Quick start (development)
 1. Build Tailwind CSS (optional locally):
 
 ```bash
-npm ci
-npm run build:css
+# builds CSS (runs npm install if needed)
+make css
 ```
 
 2. Run the server locally:
 
 ```bash
+# set your master password, then run the development server via Makefile
 export MASTER_PASSWORD='your-secret-password'
-GOCACHE=$(pwd)/.gocache go run ./cmd/easywebgpg
+make run-dev
 ```
+
+Note on run targets:
+
+- `make run-dev`: builds a development binary (with debug info) and runs it; useful when iterating locally. It also expects CSS to be built or will use the `static/dist` fallback.
+- `make run`: builds the production binary and runs it; this is closer to what the Docker image will run and produces an optimized binary in `bin/`.
+
 
 Run tests
 
 ```bash
-GOCACHE=$(pwd)/.gocache go test ./...
+make test
 ```
 
 Docker
 
-Build and run the container (the image build will include the Go binary and templates). Ensure the CSS is built (CI or local) so `static/dist/styles.css` exists.
+Build and run the container using the Makefile targets. Ensure the CSS is built (CI or local) so `static/dist/styles.css` exists.
 
 ```bash
 # build CSS locally if needed
-npm ci
-npm run build:css
+make css
 
-docker build -t easy-web-gpg:local .
-
-docker run --rm -p 8080:8080   -e MASTER_PASSWORD='your-secret-password'   easy-web-gpg:local
+# build the docker image and run it
+make docker-build
+make docker-run
 ```
 
 CI
 
-The repository may include a GitHub Actions workflow that runs tests and builds the image on every push; publishing to a registry should be gated to runs on `main` or tags. Ensure the workflow builds the CSS before building the image.
+The repository may include a GitHub Actions workflow that runs tests and builds the image on every push; publishing to a registry should be gated to runs on `main` or tags. Recommended CI steps using the Makefile targets:
+
+- Build CSS: `make css`
+- Run tests: `make test`
+- Build artifacts / binary: `make build` (or `make build-dev` for debug)
+- Build Docker image: `make docker-build`
+
+Ensure the workflow runs `make css` before `make docker-build` so `static/dist/styles.css` is present in the image.
 
 Security notes
 
