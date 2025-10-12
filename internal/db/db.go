@@ -10,13 +10,17 @@ import (
 )
 
 // OpenDB opens a DB connection. If DATABASE_URL env var is set it will use that
-// otherwise it will create/ open a local sqlite file `data.db`.
+// otherwise it will create/ open a local sqlite file `data/data.db`.
 func OpenDB() (*sqlx.DB, error) {
 	dsn := os.Getenv("DATABASE_URL")
 	var driver string
 	if dsn == "" {
 		driver = "sqlite"
-		dsn = "file:data.db?_foreign_keys=1"
+		// Ensure data directory exists
+		if err := os.MkdirAll("data", 0o700); err != nil {
+			return nil, err
+		}
+		dsn = "file:data/data.db?_foreign_keys=1"
 	} else {
 		// assume postgres URL for production
 		driver = "pgx"

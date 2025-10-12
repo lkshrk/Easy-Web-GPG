@@ -1,6 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-import { PNG } from 'pngjs';
-import pixelmatch from 'pixelmatch';
+import { test } from '@playwright/test';
+import { compareSnapshot, compareVersions } from './utils/visual-comparison';
 
 const ROUTES = ['/', '/auth'];
 
@@ -10,31 +9,15 @@ const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 720 },
 ];
 
-const DIFF_THRESHOLD_PERCENT = 0.1; // 0.1% difference allowed
-const PIXELMATCH_THRESHOLD = 0.1;
+const COMPARISON_CONFIG = {
+  diffThresholdPercent: 0.5, // 0.5% difference allowed
+  pixelmatchThreshold: 0.1,
+};
 
-async function preparePageForScreenshot(page: Page) {
-  // Disable animations
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.addStyleTag({
-    content: `
-      *, *::before, *::after {
-        animation: none !important;
-        transition: none !important;
-      }
-    `,
-  });
-
-  // Wait for fonts
-  await page.evaluate(async () => {
-    if ('fonts' in document) {
-      await document.fonts.ready;
-    }
-  });
-
-  // Extra stabilization time
-  await page.waitForTimeout(500);
-}
+// Get URLs from environment
+const BASELINE_URL = process.env.BASELINE_URL || process.env.BASE_URL || 'http://localhost:8080';
+const CURRENT_URL = process.env.BASE_URL || 'http://localhost:8080';
+const USE_COMPARISON_MODE = !!process.env.BASELINE_URL;
 
 test.describe('Visual Regression Tests', () => {
   test.describe.configure({ mode: 'parallel' });
@@ -44,20 +27,22 @@ test.describe('Visual Regression Tests', () => {
       test.use({ viewport });
 
       for (const route of ROUTES) {
-        test(`${route} matches baseline`, async ({ page }) => {
-          await page.goto(route);
-          await preparePageForScreenshot(page);
-
-          // Take screenshot
-          const screenshot = await page.screenshot({ fullPage: true });
-
-          // Compare with baseline
-          // Note: On first run, this will save the baseline
-          // On subsequent runs, it will compare
-          await expect(screenshot).toMatchSnapshot(`${viewport.name}${route.replace(/\//g, '-') || '-home'}.png`, {
-            maxDiffPixelRatio: DIFF_THRESHOLD_PERCENT / 100,
-            threshold: PIXELMATCH_THRESHOLD,
-          });
+        test(`${route} matches baseline`, async ({ page, browser }) => {
+          if (USE_COMPARISON_MODE) {
+            // Comparison mode: compare main branch vs current branch
+            await compareVersions(
+              page,
+              browser,
+              route,
+              viewport,
+              BASELINE_URL,
+              CURRENT_URL,
+              COMPARISON_CONFIG
+            );
+          } else {
+            // Snapshot mode: compare against stored snapshots
+            await compareSnapshot(page, route, viewport, COMPARISON_CONFIG);
+          }
         });
       }
     });

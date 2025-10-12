@@ -22,69 +22,121 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout current branch
         uses: actions/checkout@v5
+        with:
+          path: current
 
-      - name: Sewtup mpn
+      - name: Checkout main branch
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          path: main
+
+      - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: tests/package-lock.json
+          cache-dependency-path: current/tests/package-lock.json
 
       - name: Install test dependencies
-        working-directory: tests
+        working-directory: current/tests
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: tests
+        working-directory: current/tests
         run: npx playwright install --with-deps chromium
 
-      - name: Build Docker image
-        run: docker build -t easy-web-gpg:test .
+      - name: Build main branch Docker image
+        if: github.ref != 'refs/heads/main'
+        working-directory: main
+        run: docker build -t easy-web-gpg:main .
 
-      - name: Start application
+      - name: Build current branch Docker image
+        working-directory: current
+        run: docker build -t easy-web-gpg:current .
+
+      - name: Start main branch application
+        if: github.ref != 'refs/heads/main'
         run: |
           docker run -d \
-            --name easy-web-gpg-test \
+            --name easy-web-gpg-main \
+            -p 8081:8080 \
+            -e MASTER_PASSWORD="test-password" \
+            easy-web-gpg:main
+
+          # Wait for app to be ready
+          for i in {1..30}; do
+            if curl -f http://localhost:8081/time > /dev/null 2>&1; then
+              echo "Main branch application is ready"
+              break
+            fi
+            echo "Waiting for main branch application... ($i/30)"
+            sleep 1
+          done
+          if ! curl -f http://localhost:8081/time > /dev/null 2>&1; then
+            echo "Main branch application failed to start"
+            docker logs easy-web-gpg-main
+            exit 1
+          fi
+
+      - name: Start current branch application
+        run: |
+          docker run -d \
+            --name easy-web-gpg-current \
             -p 8080:8080 \
             -e MASTER_PASSWORD="test-password" \
-            easy-web-gpg:test
+            easy-web-gpg:current
 
           # Wait for app to be ready
           for i in {1..30}; do
             if curl -f http://localhost:8080/time > /dev/null 2>&1; then
-              echo "Application is ready"
-              exit 0
+              echo "Current branch application is ready"
+              break
             fi
-            echo "Waiting for application... ($i/30)"
+            echo "Waiting for current branch application... ($i/30)"
             sleep 1
           done
-          echo "Application failed to start"
-          docker logs easy-web-gpg-test
-          exit 1
+          if ! curl -f http://localhost:8080/time > /dev/null 2>&1; then
+            echo "Current branch application failed to start"
+            docker logs easy-web-gpg-current
+            exit 1
+          fi
 
-      - name: Run visual regression tests
-        working-directory: tests
+      - name: Run visual regression tests (comparison mode)
+        if: github.ref != 'refs/heads/main'
+        working-directory: current/tests
+        env:
+          BASE_URL: http://localhost:8080
+          BASELINE_URL: http://localhost:8081
+        run: npm run test:visual
+
+      - name: Run visual regression tests (snapshot mode)
+        if: github.ref == 'refs/heads/main'
+        working-directory: current/tests
         env:
           BASE_URL: http://localhost:8080
         run: npm run test:visual
 
-      - name: Stop application
+      - name: Stop applications
         if: always()
         run: |
-          docker logs easy-web-gpg-test || true
-          docker stop easy-web-gpg-test || true
-          docker rm easy-web-gpg-test || true
+          docker logs easy-web-gpg-main || true
+          docker stop easy-web-gpg-main || true
+          docker rm easy-web-gpg-main || true
+          docker logs easy-web-gpg-current || true
+          docker stop easy-web-gpg-current || true
+          docker rm easy-web-gpg-current || true
 
-      - name: Upload Playwright report
-        if: failure()
+      - name: Upload visual comparison artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ github.run_number }}
+          name: visual-regression-${{ github.run_number }}
           path: |
-            tests/playwright-report/**
-            tests/test-results/**
+            current/tests/playwright-report/**
+            current/tests/test-results/**
           if-no-files-found: ignore
           retention-days: 30
 

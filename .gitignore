@@ -40,6 +40,8 @@ bin/tailwindcss
 .env
 .env.local
 
+# Database files
+data/
 data.db
 
 # Temporary files

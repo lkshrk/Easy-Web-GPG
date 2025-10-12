@@ -69,7 +69,9 @@ func main() {
 	}
 
 	// Apply simple SQL migrations (development fallback)
-	if err := dbpkg.ApplySQLMigrations(db, "migrations/sql"); err != nil {
+	// Try to find the migrations directory in various locations
+	migrationPath := findDirectory("migrations", []string{"migrations/sql", "./migrations/sql", "../migrations/sql", "/migrations/sql"})
+	if err := dbpkg.ApplySQLMigrations(db, migrationPath); err != nil {
 		log.Printf("migration error (dev): %v", err)
 	}
 
