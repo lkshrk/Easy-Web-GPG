@@ -7,48 +7,81 @@
     "group:linters",
     "schedule:earlyMondays"
   ],
-  "schedule": ["before 7am every weekday"],
+  "schedule": [
+    "before 7am every weekday"
+  ],
   "timezone": "Europe/Berlin",
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "platformAutomerge": true,
   "automergeStrategy": "squash",
   "prConcurrentLimit": 5,
   "packageRules": [
     {
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "groupName": "Go dependencies",
-      "matchUpdateTypes": ["patch", "minor"],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
       "automerge": true,
       "automergeType": "pr"
     },
     {
-      "matchManagers": ["gomod"],
-      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "groupName": "Go dependencies (major)"
     },
     {
-      "matchManagers": ["npm"],
-      "matchPaths": ["tests/**"],
+      "matchManagers": [
+        "npm"
+      ],
+      "matchFileNames": [
+        "tests/**"
+      ],
       "groupName": "Test dependencies",
-      "matchUpdateTypes": ["patch", "minor"],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
       "automerge": true,
       "automergeType": "pr"
     },
     {
-      "matchManagers": ["npm"],
-      "matchPaths": ["tests/**"],
-      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "npm"
+      ],
+      "matchFileNames": [
+        "tests/**"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "groupName": "Test dependencies (major)"
     },
     {
-      "matchManagers": ["dockerfile"],
+      "matchManagers": [
+        "dockerfile"
+      ],
       "groupName": "Docker base images",
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr"
     },
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "GitHub Actions",
       "automerge": true,
       "automergeType": "pr"
@@ -58,6 +91,8 @@
     "enabled": true,
     "automerge": true,
     "automergeType": "branch",
-    "schedule": ["before 4am on sunday"]
+    "schedule": [
+      "before 4am on sunday"
+    ]
   }
 }
