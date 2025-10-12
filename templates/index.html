@@ -39,7 +39,7 @@
 
       <section class="mb-6 px-6">
         <h2 class="font-medium mb-2">Encrypt / Decrypt</h2>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <form hx-post="/encrypt" hx-swap="outerHTML" hx-target="#encrypt-result" method="post" class="space-y-4"
                 role="form" aria-labelledby="encrypt-heading" aria-describedby="encrypt-desc encrypt-error">
             <h3 id="encrypt-heading" class="text-sm font-semibold">Encrypt</h3>
@@ -100,12 +100,12 @@
           </div>
         </div>
       </div>
-      <section>
+      <section class="mb-6 px-6">
         <h2 class="font-medium mb-2">Stored Keys</h2>
         <div>
           <label class="block text-sm mb-1">Select a stored key</label>
           <form class="flex items-start gap-2" method="get" action="/keys/view">
-            <select id="stored-keys" name="id" class="flex-1 border px-2 py-1">
+            <select id="stored-keys" name="id" class="flex-1 border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
               {{range .Keys}}
               <option value="{{.ID}}">{{.Name}} — {{if .IsPrivate}}Private{{else}}Public{{end}} — Added {{.CreatedAt}}</option>
               {{else}}
@@ -116,7 +116,7 @@
               <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium">View</button>
             </div>
             <div class="flex-shrink-0">
-              <button type="submit" formaction="/keys/delete" formmethod="post" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" onclick="return confirm('Delete selected key?')">Delete</button>
+              <button type="submit" formaction="/keys/delete" formmethod="post" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium" onclick="return confirm('Delete selected key?')">Delete</button>
             </div>
           </form>
           <div id="key-detail" class="mt-2"></div>
@@ -218,7 +218,6 @@
       });
     })();
   </script>
-<  </script>
   <script>
     // Focus error alerts after HTMX swaps them into the DOM so screen readers notice
     document.body.addEventListener('htmx:afterOnLoad', function(evt){

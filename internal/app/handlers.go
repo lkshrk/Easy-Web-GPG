@@ -35,28 +35,30 @@ func sendHTMXError(w http.ResponseWriter, r *http.Request, id, msg string, statu
 	return true
 }
 
-func (a *App) IndexHandler(w http.ResponseWriter, r *http.Request) {
-	// If MASTER_PASSWORD is set, require authentication via cookie
+// requireAuth checks if the request has a valid auth cookie when MASTER_PASSWORD is set.
+// Returns true if authenticated or auth not required, false if login page was shown.
+func (a *App) requireAuth(w http.ResponseWriter, r *http.Request) bool {
 	masterPass := os.Getenv("MASTER_PASSWORD")
-	if masterPass != "" {
-		if c, err := r.Cookie("webgpg_auth"); err == nil {
-			if cm.VerifyAuthCookieValue(c.Value, 24*60*60) {
-				// proceed to render UI
-			} else {
-				if err := a.Templates.ExecuteTemplate(w, "login.html", nil); err != nil {
-					// fallback minimal form
-					w.Header().Set("Content-Type", "text/html; charset=utf-8")
-					w.Write([]byte(`<form method="post" action="/auth"><input type="password" name="password" placeholder="Master password"/><button type="submit">Unlock</button></form>`))
-				}
-				return
-			}
-		} else {
-			if err := a.Templates.ExecuteTemplate(w, "login.html", nil); err != nil {
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				w.Write([]byte(`<form method="post" action="/auth"><input type="password" name="password" placeholder="Master password"/><button type="submit">Unlock</button></form>`))
-			}
-			return
+	if masterPass == "" {
+		return true // No auth required
+	}
+
+	c, err := r.Cookie("webgpg_auth")
+	if err != nil || !cm.VerifyAuthCookieValue(c.Value, 24*60*60) {
+		// Show login page
+		if err := a.Templates.ExecuteTemplate(w, "login.html", nil); err != nil {
+			// Fallback minimal form
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Write([]byte(`<form method="post" action="/auth"><input type="password" name="password" placeholder="Master password"/><button type="submit">Unlock</button></form>`))
 		}
+		return false
+	}
+	return true
+}
+
+func (a *App) IndexHandler(w http.ResponseWriter, r *http.Request) {
+	if !a.requireAuth(w, r) {
+		return
 	}
 
 	var keys []mm.Key
@@ -83,11 +85,12 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	// Validate key
-	isPrivate := false
-	if _, err := crypto.NewKeyFromArmored(armored); err == nil {
-		k, _ := crypto.NewKeyFromArmored(armored)
-		isPrivate = k.IsPrivate()
+	k, err := crypto.NewKeyFromArmored(armored)
+	if err != nil {
+		http.Error(w, "invalid PGP key", http.StatusBadRequest)
+		return
 	}
+	isPrivate := k.IsPrivate()
 
 	var encrypted *string
 	var bcryptHash *string
@@ -111,7 +114,7 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Try sqlite style first
-	_, err := a.DB.Exec("INSERT INTO keys (name, armored, is_private, encrypted_password, password_bcrypt, created_at) VALUES (?, ?, ?, ?, ?, ?)", name, armored, isPrivate, encrypted, bcryptHash, time.Now())
+	_, err = a.DB.Exec("INSERT INTO keys (name, armored, is_private, encrypted_password, password_bcrypt, created_at) VALUES (?, ?, ?, ?, ?, ?)", name, armored, isPrivate, encrypted, bcryptHash, time.Now())
 	if err != nil {
 		// try postgres param style
 		_, err = a.DB.Exec("INSERT INTO keys (name, armored, is_private, encrypted_password, password_bcrypt, created_at) VALUES ($1, $2, $3, $4, $5, $6)", name, armored, isPrivate, encrypted, bcryptHash, time.Now())

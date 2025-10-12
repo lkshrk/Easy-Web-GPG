@@ -13,6 +13,45 @@ import (
 	migratepkg "h-cloud.io/web-gpg/internal/migrate"
 )
 
+// findFile returns the first existing file path from candidates.
+func findFile(candidates []string) string {
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
+	return ""
+}
+
+// findDirectory returns the first existing directory from candidates.
+func findDirectory(name string, candidates []string) string {
+	for _, c := range candidates {
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			return c
+		}
+	}
+	log.Printf("warning: %s directory not found; using default", name)
+	return candidates[0]
+}
+
+// loadTemplates loads all HTML templates.
+func loadTemplates() *template.Template {
+	indexCandidates := []string{"templates/index.html", "./templates/index.html", "../templates/index.html", "../../templates/index.html", "/templates/index.html"}
+	loginCandidates := []string{"templates/login.html", "./templates/login.html", "../templates/login.html", "../../templates/login.html", "/templates/login.html"}
+
+	indexPath := findFile(indexCandidates)
+	if indexPath == "" {
+		log.Fatalf("templates/index.html not found in candidate paths")
+	}
+
+	files := []string{indexPath}
+	if loginPath := findFile(loginCandidates); loginPath != "" {
+		files = append(files, loginPath)
+	}
+
+	return template.Must(template.ParseFiles(files...))
+}
+
 func main() {
 	// Run migrations via golang-migrate only when DATABASE_URL is set (postgres).
 	// For the default sqlite (local file) we skip golang-migrate at runtime and
@@ -37,42 +76,11 @@ func main() {
 	// Provide DB to crypto package so it can store/read master salt
 	cm.SetDB(db)
 
-	// Resolve template path candidates
-	tplCandidates := []string{"templates/index.html", "./templates/index.html", "../templates/index.html", "../../templates/index.html", "/templates/index.html"}
-	// Also look for login template
-	tplCandidates2 := []string{"templates/login.html", "./templates/login.html", "../templates/login.html"}
-	var tmpl *template.Template
-	for _, c := range tplCandidates {
-		if _, err := os.Stat(c); err == nil {
-			// try to parse both index and login templates if available
-			files := []string{c}
-			for _, l := range tplCandidates2 {
-				if _, err := os.Stat(l); err == nil {
-					files = append(files, l)
-					break
-				}
-			}
-			tmpl = template.Must(template.ParseFiles(files...))
-			break
-		}
-	}
-	if tmpl == nil {
-		log.Fatalf("templates/index.html not found in candidate paths")
-	}
+	// Load templates
+	tmpl := loadTemplates()
 
-	// Resolve static dir candidates
-	staticCandidates := []string{"static/dist", "./static/dist", "../static/dist", "../../static/dist", "/static/dist"}
-	var staticDir string
-	for _, s := range staticCandidates {
-		if fi, err := os.Stat(s); err == nil && fi.IsDir() {
-			staticDir = s
-			break
-		}
-	}
-	if staticDir == "" {
-		log.Printf("warning: no static/dist directory found among candidates; static files may 404")
-		staticDir = "static/dist"
-	}
+	// Resolve static directory
+	staticDir := findDirectory("static", []string{"static", "./static", "../static", "../../static", "/static"})
 
 	fsHandler := http.FileServer(http.Dir(staticDir))
 	a := &app.App{DB: db, Templates: tmpl}
@@ -91,7 +99,11 @@ func main() {
 	http.HandleFunc("/encrypt", a.EncryptHandler)
 	http.HandleFunc("/decrypt", a.DecryptHandler)
 
-	addr := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := ":" + port
 	log.Printf("Listening on %s", addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatal(err)

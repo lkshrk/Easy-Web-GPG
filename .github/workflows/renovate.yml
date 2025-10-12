@@ -1,0 +1,17 @@
+name: Renovate
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Every Monday at 6am
+  workflow_dispatch:
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: renovatebot/github-action@v43.0.13
+        with:
+          renovate-version: latest
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}

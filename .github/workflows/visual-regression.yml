@@ -1,0 +1,104 @@
+name: Visual Regression
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+jobs:
+  skip_notice:
+    if: ${{ (github.event.head_commit && contains(github.event.head_commit.message, '[ui-change]')) || (github.event.commits && contains(toJSON(github.event.commits), '[ui-change]')) }}
+    name: Skipped Visual Tests Notice
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log skip reason
+        run: echo 'Skipping visual regression tests because commit message contains the [ui-change] tag.'
+
+  visual-test:
+    if: ${{ !((github.event.head_commit && contains(github.event.head_commit.message, '[ui-change]')) || (github.event.commits && contains(toJSON(github.event.commits), '[ui-change]'))) }}
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Sewtup mpn
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Docker image
+        run: docker build -t easy-web-gpg:test .
+
+      - name: Start application
+        run: |
+          docker run -d \
+            --name easy-web-gpg-test \
+            -p 8080:8080 \
+            -e MASTER_PASSWORD="test-password" \
+            easy-web-gpg:test
+
+          # Wait for app to be ready
+          for i in {1..30}; do
+            if curl -f http://localhost:8080/time > /dev/null 2>&1; then
+              echo "Application is ready"
+              exit 0
+            fi
+            echo "Waiting for application... ($i/30)"
+            sleep 1
+          done
+          echo "Application failed to start"
+          docker logs easy-web-gpg-test
+          exit 1
+
+      - name: Run visual regression tests
+        working-directory: tests
+        env:
+          BASE_URL: http://localhost:8080
+        run: npm run test:visual
+
+      - name: Stop application
+        if: always()
+        run: |
+          docker logs easy-web-gpg-test || true
+          docker stop easy-web-gpg-test || true
+          docker rm easy-web-gpg-test || true
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_number }}
+          path: |
+            tests/playwright-report/**
+            tests/test-results/**
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run_url = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;
+            const artifact_url = `${run_url}#artifacts`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `❌ Visual regression tests failed!\n\n[View test results](${run_url})\n[Download report](${artifact_url})\n\nIf these changes are intentional, add \`[ui-change]\` to your commit message.`
+            });

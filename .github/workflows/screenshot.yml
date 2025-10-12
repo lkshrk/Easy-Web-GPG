@@ -1,0 +1,63 @@
+name: Update Screenshot
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Build Docker image
+        run: docker build -t easy-web-gpg:screenshot .
+
+      - name: Start application
+        run: |
+          docker run -d --name easy-web-gpg-screenshot \
+            -p 8080:8080 \
+            -e MASTER_PASSWORD="screenshot-demo" \
+            easy-web-gpg:screenshot
+
+          # Wait for server to be ready
+          timeout 30 bash -c 'until curl -sf http://localhost:8080 > /dev/null; do sleep 1; done'
+
+      - name: Generate screenshot
+        run: |
+          # Install chromium for headless screenshots
+          sudo apt-get update -y
+          sudo apt-get install -y chromium-browser --no-install-recommends
+
+          # Take screenshot with headless chromium (1200x800 window)
+          chromium-browser --headless --disable-gpu --no-sandbox \
+            --window-size=1200,800 \
+            --screenshot=.github/screenshot.png \
+            "http://127.0.0.1:8080"
+
+      - name: Stop application
+        if: always()
+        run: docker stop easy-web-gpg-screenshot || true
+
+      - name: Commit and push screenshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add .github/screenshot.png || true
+
+          if git diff --staged --quiet; then
+            echo "Screenshot unchanged"
+          else
+            git commit -m "ci: regenerate screenshot [skip ci]"
+            git push --force-with-lease origin HEAD:ci/screenshot
+            echo "Screenshot updated and pushed to ci/screenshot branch"
+          fi
