@@ -4,13 +4,12 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"os"
 
 	cm "h-cloud.io/web-gpg/internal/crypto"
 )
 
 func (a *App) requireAuth(w http.ResponseWriter, r *http.Request) bool {
-	if os.Getenv("MASTER_PASSWORD") == "" {
+	if a.MasterPassword == "" {
 		return true
 	}
 
@@ -72,11 +71,20 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 		Value:    val,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   isHTTPS(r),
 		MaxAge:   int(authCookieMaxAge),
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, cookie)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// isHTTPS returns true if the request arrived over TLS or via a trusted proxy.
+func isHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 // LogoutHandler clears the auth cookie and redirects to root.

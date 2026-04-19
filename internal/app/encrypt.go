@@ -1,7 +1,7 @@
 package app
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -50,7 +50,8 @@ func (a *App) EncryptHandler(w http.ResponseWriter, r *http.Request) {
 	message := crypto.NewPlainMessageFromString(plaintext)
 	pgpMsg, err := recipientKR.Encrypt(message, nil)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("encrypt error: %v", err)
+		http.Error(w, "encryption failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -133,7 +134,8 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 
 	decrypted, err := kr.Decrypt(encMessage, nil, 0)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("decrypt error: %v", err), http.StatusInternalServerError)
+		log.Printf("decrypt error: %v", err)
+		http.Error(w, "decryption failed", http.StatusInternalServerError)
 		return
 	}
 

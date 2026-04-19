@@ -33,7 +33,7 @@ build-errors.log
 
 # Go
 bin/
-easywebgpg
+/easywebgpg
 *.exe
 *.out
 .gocache

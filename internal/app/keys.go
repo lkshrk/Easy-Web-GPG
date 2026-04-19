@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"time"
 
@@ -52,7 +53,8 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	q := a.DB.Rebind("INSERT INTO keys (name, armored, is_private, encrypted_password, password_bcrypt, created_at) VALUES (?, ?, ?, ?, ?, ?)")
 	if _, err = a.DB.ExecContext(r.Context(), q, name, armored, isPrivate, encrypted, bcryptHash, time.Now()); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("error inserting key: %v", err)
+		http.Error(w, "failed to store key", http.StatusInternalServerError)
 		return
 	}
 
@@ -79,7 +81,7 @@ func (a *App) ViewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, `<div class="p-2 border rounded bg-gray-50"><strong>%s</strong> — %s — Added %s<pre class="mt-2 p-2 bg-white text-sm">%s</pre></div>`,
+	fmt.Fprintf(w, `<div class="p-3 border border-[#292e42] rounded-md bg-[#24283b]"><strong class="text-[#c0caf5]">%s</strong> <span class="text-[#565f89]">—</span> <span class="text-[#7aa2f7]">%s</span> <span class="text-[#565f89]">— Added %s</span><pre class="mt-2 p-2 bg-[#16161e] text-sm text-[#a9b1d6] rounded overflow-x-auto">%s</pre></div>`,
 		template.HTMLEscapeString(k.Name),
 		keyType,
 		template.HTMLEscapeString(k.CreatedAt.String()),

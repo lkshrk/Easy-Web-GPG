@@ -46,7 +46,7 @@ func setupTestApp(t *testing.T) (*apppkg.App, *sqlx.DB) {
 		t.Fatalf("parse templates: %v", err)
 	}
 
-	a := &apppkg.App{DB: db, Templates: tmpl, Crypto: crypto}
+	a := &apppkg.App{DB: db, Templates: tmpl, Crypto: crypto, MasterPassword: "test-master-password"}
 	return a, db
 }
 
@@ -130,6 +130,7 @@ func TestStory_AddKeyEncryptDecryptRoundtrip(t *testing.T) {
 func TestStory_AuthLoginLogout(t *testing.T) {
 	a, _ := setupTestApp(t)
 	t.Setenv("MASTER_PASSWORD", "s3cret")
+	a.MasterPassword = "s3cret"
 
 	// Step 1: Unauthenticated request to / shows login page
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -272,6 +273,382 @@ func TestStory_AddAndDeleteKey(t *testing.T) {
 	db.Get(&count, "SELECT COUNT(*) FROM keys WHERE name = 'my-test-key'")
 	if count != 0 {
 		t.Fatalf("expected 0 keys after delete, got %d", count)
+	}
+}
+
+// TestIndexHandler_RendersKeys verifies the index page renders stored keys.
+func TestIndexHandler_RendersKeys(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	priv, _ := gcrypto.GenerateKey("Visible Key", "v@test.com", "", 2048)
+	pubArmored, _ := priv.GetArmoredPublicKey()
+	db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
+		"Visible Key", pubArmored, false, time.Now())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	a.IndexHandler(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "Visible Key") {
+		t.Fatal("expected key name in rendered output")
+	}
+}
+
+// TestViewKeyHandler verifies viewing a stored key returns its details.
+func TestViewKeyHandler(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	priv, _ := gcrypto.GenerateKey("View Test", "v@test.com", "", 2048)
+	pubArmored, _ := priv.GetArmoredPublicKey()
+	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
+		"View Test", pubArmored, false, time.Now())
+	keyID, _ := res.LastInsertId()
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/keys/view?id=%d", keyID), nil)
+	w := httptest.NewRecorder()
+	a.ViewKeyHandler(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "View Test") {
+		t.Fatal("expected key name in response")
+	}
+	if !strings.Contains(body, "Public") {
+		t.Fatal("expected key type in response")
+	}
+}
+
+// TestViewKeyHandler_MissingID verifies missing id returns 422.
+func TestViewKeyHandler_MissingID(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/keys/view", nil)
+	w := httptest.NewRecorder()
+	a.ViewKeyHandler(w, req)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d", w.Code)
+	}
+}
+
+// TestViewKeyHandler_NotFound verifies non-existent key returns 404.
+func TestViewKeyHandler_NotFound(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/keys/view?id=99999", nil)
+	w := httptest.NewRecorder()
+	a.ViewKeyHandler(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+// TestMethodNotAllowed verifies POST-only handlers reject GET requests.
+func TestMethodNotAllowed(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		path    string
+	}{
+		{"auth", a.AuthHandler, "/auth"},
+		{"addKey", a.AddKeyHandler, "/keys"},
+		{"deleteKey", a.DeleteKeyHandler, "/keys/delete"},
+		{"encrypt", a.EncryptHandler, "/encrypt"},
+		{"decrypt", a.DecryptHandler, "/decrypt"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			w := httptest.NewRecorder()
+			tt.handler(w, req)
+			if w.Code != http.StatusMethodNotAllowed {
+				t.Errorf("expected 405, got %d", w.Code)
+			}
+		})
+	}
+}
+
+// TestAddKeyHandler_InvalidPGP verifies invalid PGP key input returns 400.
+func TestAddKeyHandler_InvalidPGP(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	form := url.Values{}
+	form.Set("name", "bad-key")
+	form.Set("armored", "not a valid PGP key")
+	req := httptest.NewRequest(http.MethodPost, "/keys", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.AddKeyHandler(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestEncryptHandler_KeyNotFound verifies encrypt with non-existent key returns 422.
+func TestEncryptHandler_KeyNotFound(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	form := url.Values{}
+	form.Set("key", "99999")
+	form.Set("input", "hello")
+	req := httptest.NewRequest(http.MethodPost, "/encrypt", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.EncryptHandler(w, req)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d", w.Code)
+	}
+}
+
+// TestDecryptHandler_InvalidMessage verifies decrypt with bad PGP message returns error.
+func TestDecryptHandler_InvalidMessage(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	priv, _ := gcrypto.GenerateKey("Dec Test", "d@t.com", "", 2048)
+	privArmored, _ := priv.Armor()
+	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
+		"dec-test", privArmored, true, time.Now())
+	keyID, _ := res.LastInsertId()
+
+	form := url.Values{}
+	form.Set("key", fmt.Sprint(keyID))
+	form.Set("input", "not a PGP message")
+	req := httptest.NewRequest(http.MethodPost, "/decrypt", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.DecryptHandler(w, req)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestDeleteKeyHandler_MissingID verifies delete with no id returns 422.
+func TestDeleteKeyHandler_MissingID(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/keys/delete", strings.NewReader(""))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.DeleteKeyHandler(w, req)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d", w.Code)
+	}
+}
+
+// TestNoAuthRequired verifies all routes are accessible when MasterPassword is empty.
+func TestNoAuthRequired(t *testing.T) {
+	a, _ := setupTestApp(t)
+	a.MasterPassword = ""
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	a.WithAuth(a.IndexHandler)(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 without auth, got %d", w.Code)
+	}
+	// Should show the app, not the login page
+	if strings.Contains(w.Body.String(), `action="/auth"`) {
+		t.Fatal("should not show login when MasterPassword is empty")
+	}
+}
+
+// TestRateLimit verifies the rate limiter blocks after max attempts.
+func TestRateLimit(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	rl := apppkg.NewRateLimiter(time.Minute, 3)
+	handler := apppkg.RateLimit(rl, a.AuthHandler)
+
+	for i := 0; i < 3; i++ {
+		form := url.Values{}
+		form.Set("password", "wrong")
+		req := httptest.NewRequest(http.MethodPost, "/auth", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = "1.2.3.4:1234"
+		w := httptest.NewRecorder()
+		handler(w, req)
+		if w.Code == http.StatusTooManyRequests {
+			t.Fatalf("should not be rate limited on attempt %d", i+1)
+		}
+	}
+
+	// 4th attempt should be blocked
+	form := url.Values{}
+	form.Set("password", "wrong")
+	req := httptest.NewRequest(http.MethodPost, "/auth", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.RemoteAddr = "1.2.3.4:1234"
+	w := httptest.NewRecorder()
+	handler(w, req)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429, got %d", w.Code)
+	}
+}
+
+// TestAddKeyHandler_WithPassphrase verifies adding a key with a passphrase
+// encrypts and stores it.
+func TestAddKeyHandler_WithPassphrase(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	priv, _ := gcrypto.GenerateKey("Pass Key", "p@test.com", "keypass", 2048)
+	privArmored, _ := priv.Armor()
+
+	form := url.Values{}
+	form.Set("name", "pass-key")
+	form.Set("armored", privArmored)
+	form.Set("password", "keypass")
+	req := httptest.NewRequest(http.MethodPost, "/keys", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.AddKeyHandler(w, req)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify the encrypted password was stored
+	var encPass *string
+	db.Get(&encPass, "SELECT encrypted_password FROM keys WHERE name = 'pass-key'")
+	if encPass == nil || *encPass == "" {
+		t.Fatal("expected encrypted password to be stored")
+	}
+}
+
+// TestDecryptHandler_LockedKeyWithStoredPassword tests decryption with a
+// password-protected private key that has a stored passphrase.
+func TestDecryptHandler_LockedKeyWithStoredPassword(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	// Generate a password-protected key
+	priv, _ := gcrypto.GenerateKey("Locked Key", "l@t.com", "keypass", 2048)
+	privArmored, _ := priv.Armor()
+	pubArmored, _ := priv.GetArmoredPublicKey()
+
+	// Encrypt the passphrase for storage
+	encPass, err := a.Crypto.Encrypt([]byte("keypass"))
+	if err != nil {
+		t.Fatalf("encrypt passphrase: %v", err)
+	}
+
+	// Store private key with encrypted passphrase
+	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, encrypted_password, created_at) VALUES (?, ?, ?, ?, ?)",
+		"locked-key", privArmored, true, &encPass, time.Now())
+	privID, _ := res.LastInsertId()
+
+	// Encrypt a message with the public key
+	pubKey, _ := gcrypto.NewKeyFromArmored(pubArmored)
+	kr, _ := gcrypto.NewKeyRing(pubKey)
+	msg := gcrypto.NewPlainMessageFromString("secret data")
+	pgpMsg, _ := kr.Encrypt(msg, nil)
+	armored, _ := pgpMsg.GetArmored()
+
+	// Decrypt using the locked key (should auto-unlock with stored passphrase)
+	form := url.Values{}
+	form.Set("key", fmt.Sprint(privID))
+	form.Set("input", armored)
+	req := httptest.NewRequest(http.MethodPost, "/decrypt", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.DecryptHandler(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if got := strings.TrimSpace(w.Body.String()); got != "secret data" {
+		t.Fatalf("got %q, want %q", got, "secret data")
+	}
+}
+
+// TestDecryptHandler_KeyNotFound verifies decrypt with non-existent key returns 422.
+func TestDecryptHandler_KeyNotFound(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	form := url.Values{}
+	form.Set("key", "99999")
+	form.Set("input", "-----BEGIN PGP MESSAGE-----\nfake\n-----END PGP MESSAGE-----")
+	req := httptest.NewRequest(http.MethodPost, "/decrypt", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.DecryptHandler(w, req)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d", w.Code)
+	}
+}
+
+// TestRequestLogger verifies the request logging middleware.
+func TestRequestLogger(t *testing.T) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+	handler := apppkg.RequestLogger(inner)
+
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// TestAuthHandler_MasterPasswordNotInEnv verifies auth returns 500 when
+// MASTER_PASSWORD env is cleared but App.MasterPassword is set (config drift).
+func TestAuthHandler_MasterPasswordNotInEnv(t *testing.T) {
+	a, _ := setupTestApp(t)
+	// Clear the env var but keep struct field — simulates config drift
+	t.Setenv("MASTER_PASSWORD", "")
+
+	form := url.Values{}
+	form.Set("password", "anything")
+	req := httptest.NewRequest(http.MethodPost, "/auth", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.AuthHandler(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestEncryptHandler_FullPath tests a successful encryption through the handler.
+func TestEncryptHandler_FullPath(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	priv, _ := gcrypto.GenerateKey("Enc Test", "e@test.com", "", 2048)
+	pubArmored, _ := priv.GetArmoredPublicKey()
+	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
+		"enc-test", pubArmored, false, time.Now())
+	keyID, _ := res.LastInsertId()
+
+	form := url.Values{}
+	form.Set("key", fmt.Sprint(keyID))
+	form.Set("input", "encrypt me")
+	req := httptest.NewRequest(http.MethodPost, "/encrypt", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.EncryptHandler(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "BEGIN PGP MESSAGE") {
+		t.Fatal("expected PGP armored output")
+	}
+}
+
+// TestRequireAuth_NonRootRedirect verifies non-root paths redirect to / when unauthorized.
+func TestRequireAuth_NonRootRedirect(t *testing.T) {
+	a, _ := setupTestApp(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/keys/view?id=1", nil)
+	w := httptest.NewRecorder()
+	a.WithAuth(a.ViewKeyHandler)(w, req)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d", w.Code)
+	}
+	if loc := w.Header().Get("Location"); loc != "/" {
+		t.Fatalf("expected redirect to /, got %q", loc)
 	}
 }
 

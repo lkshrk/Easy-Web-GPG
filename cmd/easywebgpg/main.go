@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"h-cloud.io/web-gpg/internal/app"
@@ -77,30 +80,59 @@ func main() {
 	staticDir := findDirectory("static", []string{"static", "./static", "../static", "../../static", "/static"})
 	fsHandler := http.FileServer(http.Dir(staticDir))
 
-	a := &app.App{DB: db, Templates: tmpl, Crypto: cryptoSvc}
+	a := &app.App{
+		DB:             db,
+		Templates:      tmpl,
+		Crypto:         cryptoSvc,
+		MasterPassword: os.Getenv("MASTER_PASSWORD"),
+	}
 
-	http.Handle("/static/", http.StripPrefix("/static/", fsHandler))
-	http.HandleFunc("/time", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.Handle("/static/", http.StripPrefix("/static/", fsHandler))
+	mux.HandleFunc("/time", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(time.Now().Format("15:04:05 MST — Jan 2 2006")))
 	})
-	http.HandleFunc("/auth", a.AuthHandler)
-	http.HandleFunc("/logout", a.LogoutHandler)
+	mux.HandleFunc("/auth", app.RateLimit(app.AuthRateLimiter, a.AuthHandler))
+	mux.HandleFunc("/logout", a.LogoutHandler)
 
-	http.HandleFunc("/", a.WithAuth(a.IndexHandler))
-	http.HandleFunc("/keys", a.WithAuth(a.AddKeyHandler))
-	http.HandleFunc("/keys/view", a.WithAuth(a.ViewKeyHandler))
-	http.HandleFunc("/keys/delete", a.WithAuth(a.DeleteKeyHandler))
-	http.HandleFunc("/encrypt", a.WithAuth(a.EncryptHandler))
-	http.HandleFunc("/decrypt", a.WithAuth(a.DecryptHandler))
+	mux.HandleFunc("/", a.WithAuth(a.IndexHandler))
+	mux.HandleFunc("/keys", a.WithAuth(a.AddKeyHandler))
+	mux.HandleFunc("/keys/view", a.WithAuth(a.ViewKeyHandler))
+	mux.HandleFunc("/keys/delete", a.WithAuth(a.DeleteKeyHandler))
+	mux.HandleFunc("/encrypt", a.WithAuth(a.EncryptHandler))
+	mux.HandleFunc("/decrypt", a.WithAuth(a.DecryptHandler))
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	addr := ":" + port
+
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      app.RequestLogger(mux),
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Graceful shutdown on SIGINT/SIGTERM.
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		sig := <-sigCh
+		log.Printf("Received %s, shutting down...", sig)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("shutdown error: %v", err)
+		}
+		db.Close()
+	}()
+
 	log.Printf("Listening on %s", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
