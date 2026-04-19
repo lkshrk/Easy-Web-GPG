@@ -1,13 +1,24 @@
 # macOS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Icon?
 
 # Windows
 Thumbs.db
 ehthumbs.db
 desktop.ini
+$RECYCLE.BIN/
+*.lnk
 
 # Linux
 *~
+.directory
+.Trash-*
 
 # Build output
 static/dist/
@@ -15,6 +26,10 @@ coverage.out
 coverage.html
 *.log
 *.tmp
+
+# Air (live reload)
+tmp/
+build-errors.log
 
 # Go
 bin/
@@ -29,9 +44,30 @@ bin/tailwindcss
 .vscode/
 .idea/
 *.iml
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+.project
+.classpath
+.settings/
+*.kate-swp
+.fleet/
 
-# Neovim
+# Vim / Neovim
 *.swp
+*.swo
+*.swn
+[._]*.s[a-v][a-z]
+Session.vim
+.netrwhist
+tags
+
+# Emacs
+\#*\#
+*.elc
+.emacs.desktop
+auto-save-list/
+tramp
 
 # Zed
 .zed/
@@ -48,4 +84,21 @@ data.db
 *.pid
 *.sock
 
-.claude
+# AI tools
+.claude/
+.claude_memory
+.aider*
+.cursor/
+.cursorignore
+.cursorules
+.copilot/
+.github/copilot/
+.codeium/
+.continue/
+.windsurf/
+.bolt/
+.cody/
+.tabnine/
+
+# OMC (oh-my-claudecode)
+.omc/

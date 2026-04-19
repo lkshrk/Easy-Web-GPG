@@ -6,20 +6,45 @@
     <title>PGP Web — Unlock</title>
     <link rel="stylesheet" href="/static/dist/styles.css" />
   </head>
-  <body class="bg-gray-50 min-h-screen flex items-center justify-center">
-    <main class="max-w-md w-full p-8 bg-white rounded-2xl shadow-lg border border-slate-100">
-      <h1 class="text-2xl font-semibold text-slate-800 mb-4">Unlock PGP Web</h1>
-      {{if .Error}}
-      <div class="mb-3 text-sm text-rose-600">{{.Error}}</div>
-      {{end}}
-      <form action="/auth" method="post" class="space-y-4">
-        <div>
-          <input name="password" type="password" placeholder="Master password" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+  <body class="bg-[#1a1b26] min-h-screen flex items-center justify-center p-4">
+    <main class="max-w-sm w-full">
+      <div class="bg-[#24283b] rounded-xl border border-[#292e42] p-8">
+        <div class="mb-6">
+          <pre class="text-[#7aa2f7] text-xs mb-3 select-none">┌──────────────┐
+│  ◆  PGP Web  │
+└──────────────┘</pre>
+          <p class="text-[#565f89] text-sm">Enter master password to continue.</p>
         </div>
-        <div>
-          <button class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" type="submit">Unlock</button>
+
+        {{if .Error}}
+        <div class="mb-4 px-3 py-2 rounded-md bg-[#f7768e]/10 border border-[#f7768e]/20 text-[#f7768e] text-sm">
+          {{.Error}}
         </div>
-      </form>
+        {{end}}
+
+        <form action="/auth" method="post" class="space-y-4">
+          <div>
+            <label class="block text-[#565f89] text-xs mb-1.5 uppercase tracking-wider">Password</label>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#565f89] text-sm select-none">❯</span>
+              <input
+                name="password"
+                type="password"
+                autofocus
+                required
+                placeholder="••••••••"
+                class="w-full bg-[#16161e] border border-[#292e42] rounded-md pl-8 pr-3 py-2.5 text-[#c0caf5] placeholder-[#565f89] text-sm focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] transition-colors"
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            class="w-full bg-[#7aa2f7] hover:bg-[#6a92e7] text-[#1a1b26] font-semibold text-sm py-2.5 rounded-md transition-colors"
+          >
+            Unlock
+          </button>
+        </form>
+      </div>
     </main>
   </body>
 </html>

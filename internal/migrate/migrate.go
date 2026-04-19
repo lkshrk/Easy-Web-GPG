@@ -10,8 +10,9 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-// RunMigrations runs SQL migrations using golang-migrate reading files from migrations/sql.
-// It reads DATABASE_URL; if unset, it uses sqlite at file:data.db
+// RunMigrations uses golang-migrate for PostgreSQL production deployments.
+// It reads DATABASE_URL; if unset, falls back to sqlite at file:data.db.
+// For SQLite development environments, use ApplySQLMigrations in internal/db instead.
 func RunMigrations() error {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {

@@ -31,7 +31,7 @@ RUN TAILWIND_ARCH=$(case ${TARGETARCH:-amd64} in \
 # ------------------------------------------------------------------------------
 # Stage 2: Build Go binary
 # ------------------------------------------------------------------------------
-FROM golang:1.24-alpine AS go_builder
+FROM golang:1.25-alpine AS go_builder
 
 WORKDIR /src
 

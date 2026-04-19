@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    environment:
+      - MASTER_PASSWORD=${MASTER_PASSWORD:-changeme}
+      - CGO_ENABLED=0
+    volumes:
+      # Mount source code for live reloading
+      - .:/app
+      # Mount data directory
+      - ./data:/data
+      # Exclude tmp directory to avoid conflicts
+      - /app/tmp
+    restart: unless-stopped
+    command: air -c .air.toml
+
+  # CSS watcher for Tailwind rebuilds
+  css-watcher:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./static:/app/static
+      - ./templates:/app/templates
+    command: sh -c "npx -y tailwindcss@latest -i ./static/css/input.css -o ./static/dist/styles.css --watch"

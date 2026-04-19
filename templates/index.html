@@ -3,229 +3,241 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>PGP Web — Encrypt / Decrypt</title>
+    <title>PGP Web</title>
     <link rel="stylesheet" href="/static/dist/styles.css" />
   </head>
-  <body class="bg-gray-50 min-h-screen flex items-center justify-center">
-    <main class="max-w-5xl w-full p-6 bg-slate-50 rounded-lg">
-      <div class="mx-auto bg-white rounded-2xl shadow-lg overflow-hidden border border-slate-100">
-        <div class="p-6 lg:flex lg:items-start lg:gap-6">
+  <body class="bg-[#1a1b26] min-h-screen text-[#c0caf5]">
 
-          <div class="flex-1">
-            <h1 class="text-2xl font-semibold text-slate-800 mb-1">PGP Web</h1>
-            <p class="text-sm text-slate-500 mb-4">Securely encrypt and decrypt messages with stored PGP keys.</p>
-
-
-      <section class="mb-6 px-6">
-        <h2 class="font-medium mb-2">Add Key</h2>
-        <form action="/keys" method="post" class="space-y-4">
-          <div>
-            <label class="block text-sm">Name</label>
-            <input name="name" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
-          </div>
-          <div>
-            <label class="block text-sm">Armored Key</label>
-            <textarea name="armored" rows="6" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-          </div>
-          <div>
-            <label class="block text-sm">Passphrase (optional)</label>
-            <input name="password" type="password" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
-          </div>
-          <div>
-            <button class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" type="submit">Add Key</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="mb-6 px-6">
-        <h2 class="font-medium mb-2">Encrypt / Decrypt</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <form hx-post="/encrypt" hx-swap="outerHTML" hx-target="#encrypt-result" method="post" class="space-y-4"
-                role="form" aria-labelledby="encrypt-heading" aria-describedby="encrypt-desc encrypt-error">
-            <h3 id="encrypt-heading" class="text-sm font-semibold">Encrypt</h3>
-            <p id="encrypt-desc" class="sr-only">Encrypt a message to the selected recipient. Use the search box to find a recipient.</p>
-            <div id="encrypt-error" role="alert" aria-live="assertive" class="sr-only"></div>
-            <div>
-              <label class="block text-sm">Key</label>
-              <div class="relative">
-                <input id="key-search" type="text" placeholder="Search recipient..." autocomplete="off"
-                  role="combobox" aria-autocomplete="list" aria-controls="key-list" aria-expanded="false" aria-haspopup="listbox" aria-activedescendant=""
-  
-                  class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" aria-describedby="key-desc key-error" />
-                <input type="hidden" name="key" id="key-input" />
-                <p id="key-desc" class="sr-only">Type to filter recipient list. Use arrow keys to navigate and Enter to select.</p>
-                <div id="key-error" role="alert" aria-live="assertive" class="sr-only"></div>
-                <div id="key-list" role="listbox" aria-label="Recipient keys"
-                  class="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-md max-h-48 overflow-auto hidden"></div>
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm">Plaintext</label>
-              <textarea name="input" rows="6" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-            </div>
-            <div>
-              <button class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" type="submit">Encrypt</button>
-            </div>
-          </form>
-
-          <div id="encrypt-result" class="col-span-1"></div>
-
-          <form hx-post="/decrypt" hx-swap="outerHTML" hx-target="#decrypt-result" method="post" class="space-y-4"
-                role="form" aria-labelledby="decrypt-heading" aria-describedby="decrypt-desc decrypt-error">
-            <h3 id="decrypt-heading" class="text-sm font-semibold">Decrypt</h3>
-            <p id="decrypt-desc" class="sr-only">Decrypt an armored message using a stored private key.</p>
-            <div id="decrypt-error" role="alert" aria-live="assertive" class="sr-only"></div>
-            <div>
-              <label class="block text-sm">Key</label>
-              <select name="key" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                {{range .Keys}}
-                {{if .IsPrivate}}
-                <option value="{{.ID}}">{{.Name}}</option>
-                {{end}}
-                {{end}}
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm">Armored Message</label>
-              <textarea name="input" rows="6" class="w-full border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-            </div>
-            <div>
-              <button class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium" type="submit">Decrypt</button>
-            </div>
-          </form>
-          <div id="decrypt-result" class="col-span-1"></div>
-        </div>
-      </section>
-
-          </div>
-        </div>
+    <!-- Top bar -->
+    <header class="border-b border-[#292e42] px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-[#7aa2f7] font-bold">◆</span>
+        <h1 class="text-lg font-semibold text-[#c0caf5]">PGP Web</h1>
       </div>
-      <section class="mb-6 px-6">
-        <h2 class="font-medium mb-2">Stored Keys</h2>
-        <div>
-          <label class="block text-sm mb-1">Select a stored key</label>
-          <form class="flex items-start gap-2" method="get" action="/keys/view">
-            <select id="stored-keys" name="id" class="flex-1 border border-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              {{range .Keys}}
-              <option value="{{.ID}}">{{.Name}} — {{if .IsPrivate}}Private{{else}}Public{{end}} — Added {{.CreatedAt}}</option>
-              {{else}}
-              <option disabled selected>No keys yet</option>
-              {{end}}
-            </select>
-            <div class="flex-shrink-0">
-              <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium">View</button>
-            </div>
-            <div class="flex-shrink-0">
-              <button type="submit" formaction="/keys/delete" formmethod="post" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium" onclick="return confirm('Delete selected key?')">Delete</button>
-            </div>
-          </form>
-          <div id="key-detail" class="mt-2"></div>
+      <a href="/logout" class="text-xs text-[#565f89] hover:text-[#a9b1d6] transition-colors">logout</a>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-8 space-y-8">
+
+      <!-- Key selector -->
+      <section class="bg-[#24283b] rounded-lg border border-[#292e42] p-5">
+        <label for="key-select" class="block text-xs text-[#565f89] uppercase tracking-wider mb-2">Active Key</label>
+        <div class="relative">
+          <select id="key-select" class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-2.5 pr-10 text-sm text-[#c0caf5] appearance-none focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] transition-colors">
+            <option value="">Select a key...</option>
+            {{range .Keys}}
+            <option value="{{.ID}}" data-is-private="{{.IsPrivate}}">{{.Name}}{{if .IsPrivate}} (private){{end}}</option>
+            {{end}}
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#565f89]">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+        <div id="key-badge" class="mt-2.5 hidden">
+          <span id="key-badge-label" class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium"></span>
+          <span id="key-badge-hint" class="text-xs text-[#565f89] ml-1.5"></span>
         </div>
       </section>
+
+      <!-- Crypto operations -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <label for="input-text" class="block text-xs text-[#565f89] uppercase tracking-wider mb-2">Input</label>
+          <textarea id="input-text" rows="12" placeholder="Paste plaintext to encrypt, or a PGP message to decrypt..."
+            class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-3 text-sm font-mono text-[#c0caf5] placeholder-[#565f89] focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] resize-y transition-colors"></textarea>
+        </div>
+        <div>
+          <label for="output-text" class="block text-xs text-[#565f89] uppercase tracking-wider mb-2">Output</label>
+          <textarea id="output-text" rows="12" readonly placeholder="Result will appear here..."
+            class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-3 text-sm font-mono text-[#a9b1d6] placeholder-[#565f89] focus:outline-none resize-y"></textarea>
+        </div>
+      </section>
+
+      <div id="error-msg" role="alert" class="hidden px-4 py-3 rounded-md bg-[#f7768e]/10 border border-[#f7768e]/20 text-sm text-[#f7768e]"></div>
+
+      <div class="flex items-center gap-3">
+        <button id="action-btn" type="button" disabled
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-md text-[#1a1b26] text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-[#7aa2f7] hover:bg-[#6a92e7]">
+          <span id="action-btn-text">Encrypt</span>
+        </button>
+        <button id="clear-btn" type="button" class="text-sm text-[#565f89] hover:text-[#a9b1d6] transition-colors">Clear</button>
+      </div>
+
+      <!-- Key management -->
+      <section class="border-t border-[#292e42] pt-8">
+        <h2 class="text-lg font-semibold text-[#bb9af7] mb-6">Key Management</h2>
+
+        <!-- Add key form -->
+        <div class="bg-[#24283b] rounded-lg border border-[#292e42] p-5 mb-6">
+          <h3 class="text-xs text-[#565f89] uppercase tracking-wider mb-4">Add New Key</h3>
+          <form action="/keys" method="post" class="space-y-3">
+            <div>
+              <label for="key-name" class="block text-xs text-[#565f89] mb-1">Name</label>
+              <input id="key-name" name="name" required
+                class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-2 text-sm text-[#c0caf5] placeholder-[#565f89] focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] transition-colors" />
+            </div>
+            <div>
+              <label for="key-armored" class="block text-xs text-[#565f89] mb-1">Armored PGP Key</label>
+              <textarea id="key-armored" name="armored" rows="4" required
+                class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-2 text-sm font-mono text-[#c0caf5] placeholder-[#565f89] focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] resize-y transition-colors"></textarea>
+            </div>
+            <div>
+              <label for="key-password" class="block text-xs text-[#565f89] mb-1">Passphrase <span class="text-[#565f89]">(optional — saved for auto-decrypt)</span></label>
+              <input id="key-password" name="password" type="password"
+                class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-2 text-sm text-[#c0caf5] focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] transition-colors" />
+            </div>
+            <div>
+              <button type="submit"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#7aa2f7] hover:bg-[#6a92e7] text-[#1a1b26] text-sm font-semibold transition-colors">
+                Add Key
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Stored keys -->
+        <div>
+          <h3 class="text-xs text-[#565f89] uppercase tracking-wider mb-3">Stored Keys</h3>
+          {{range .Keys}}
+          <div class="flex items-center justify-between py-3 border-b border-[#292e42] last:border-0 group">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="text-sm font-medium text-[#c0caf5] truncate">{{.Name}}</span>
+              {{if .IsPrivate}}
+              <span class="shrink-0 px-2 py-0.5 rounded text-[10px] font-medium bg-[#ff9e64]/15 text-[#ff9e64] border border-[#ff9e64]/25">Private</span>
+              {{else}}
+              <span class="shrink-0 px-2 py-0.5 rounded text-[10px] font-medium bg-[#9ece6a]/15 text-[#9ece6a] border border-[#9ece6a]/25">Public</span>
+              {{end}}
+              <span class="text-xs text-[#565f89] truncate">{{.CreatedAt}}</span>
+            </div>
+            <form method="post" action="/keys/delete" class="shrink-0 ml-3">
+              <input type="hidden" name="id" value="{{.ID}}" />
+              <button type="submit" onclick="return confirm('Delete this key?')"
+                class="text-xs text-[#565f89] hover:text-[#f7768e] transition-colors opacity-0 group-hover:opacity-100">Delete</button>
+            </form>
+          </div>
+          {{else}}
+          <p class="text-sm text-[#565f89] py-3">No keys stored yet.</p>
+          {{end}}
+        </div>
+      </section>
+
     </main>
-    </body>
-  <script>
-    (function(){
-      // Build list HTML from server-rendered keys
-      const keyListEl = document.getElementById('key-list');
-      const searchEl = document.getElementById('key-search');
-      const inputEl = document.getElementById('key-input');
-      if (!keyListEl || !searchEl || !inputEl) return;
 
-      // Populate the list from template-driven data (render options invisibly)
-      const keys = [];
-      // Inline the keys from the server-side template
-      // The following block is reconstructed from the same data used above
-      keyListEl.innerHTML = `
-        {{range .Keys}}{{if not .IsPrivate}}<div class="px-3 py-2 hover:bg-slate-100 cursor-pointer" data-id="{{.ID}}">{{.Name}}</div>{{end}}{{end}}
-      `;
+    <script>
+    (function() {
+      var keySelect = document.getElementById('key-select');
+      var badge = document.getElementById('key-badge');
+      var badgeLabel = document.getElementById('key-badge-label');
+      var badgeHint = document.getElementById('key-badge-hint');
+      var inputText = document.getElementById('input-text');
+      var outputText = document.getElementById('output-text');
+      var actionBtn = document.getElementById('action-btn');
+      var actionBtnText = document.getElementById('action-btn-text');
+      var clearBtn = document.getElementById('clear-btn');
+      var errorMsg = document.getElementById('error-msg');
 
-      function showList(){ keyListEl.classList.remove('hidden'); }
-      function hideList(){ keyListEl.classList.add('hidden'); highlightIndex = -1; }
+      var selectedKeyId = '';
+      var isPrivateKey = false;
+      var isDecryptMode = false;
 
-      // Tracks visible items and highlighted index for keyboard nav
-      let highlightIndex = -1;
-      function refreshItems(){
-        allItems = Array.from(keyListEl.children).filter(el => el.style.display !== 'none');
-        allItems.forEach((el,i)=> el.classList.toggle('bg-indigo-50', i===highlightIndex));
+      function isPGPMessage(text) {
+        return text.trimStart().indexOf('-----BEGIN PGP MESSAGE-----') === 0;
       }
 
-      searchEl.addEventListener('focus', function(){ showList(); refreshItems(); });
-      searchEl.addEventListener('input', function(){
-        const q = this.value.toLowerCase();
-        for(const el of keyListEl.children){
-          if(el.textContent.toLowerCase().indexOf(q) !== -1){ el.style.display = ''; } else { el.style.display = 'none' }
-        }
-        // reset highlight
-        highlightIndex = -1;
-        refreshItems();
-        // show/hide list
-        const any = Array.from(keyListEl.children).some(c => c.style.display !== 'none');
-        if(any) showList(); else hideList();
-      });
+      function updateButtonState() {
+        var hasKey = selectedKeyId !== '';
+        var hasInput = inputText.value.trim() !== '';
+        isDecryptMode = isPGPMessage(inputText.value);
 
-      // keyboard navigation
-      let allItems = Array.from(keyListEl.children);
-      searchEl.addEventListener('keydown', function(e){
-        allItems = Array.from(keyListEl.children).filter(el => el.style.display !== 'none');
-        if(e.key === 'ArrowDown'){
-          e.preventDefault();
-          if(highlightIndex < allItems.length - 1) highlightIndex++;
-          if(highlightIndex < 0 && allItems.length) highlightIndex = 0;
-          refreshItems();
-          if(allItems[highlightIndex]) allItems[highlightIndex].scrollIntoView({block:'nearest'});
-        } else if(e.key === 'ArrowUp'){
-          e.preventDefault();
-          if(highlightIndex > 0) highlightIndex--; else highlightIndex = 0;
-          refreshItems();
-          if(allItems[highlightIndex]) allItems[highlightIndex].scrollIntoView({block:'nearest'});
-        } else if(e.key === 'Enter'){
-          if(highlightIndex >= 0 && allItems[highlightIndex]){
-            const t = allItems[highlightIndex];
-            inputEl.value = t.getAttribute('data-id');
-            searchEl.value = t.textContent.trim();
-            hideList();
-            e.preventDefault();
+        if (isDecryptMode) {
+          actionBtnText.textContent = 'Decrypt';
+          actionBtn.classList.remove('bg-[#7aa2f7]', 'hover:bg-[#6a92e7]');
+          actionBtn.classList.add('bg-[#7dcfff]', 'hover:bg-[#6dbfef]');
+        } else {
+          actionBtnText.textContent = 'Encrypt';
+          actionBtn.classList.remove('bg-[#7dcfff]', 'hover:bg-[#6dbfef]');
+          actionBtn.classList.add('bg-[#7aa2f7]', 'hover:bg-[#6a92e7]');
+        }
+
+        var canAct = hasKey && hasInput;
+        if (isDecryptMode && !isPrivateKey) {
+          canAct = false;
+          if (hasKey && hasInput) {
+            showError('Select a private key to decrypt.');
           }
-        } else if(e.key === 'Escape'){
-          hideList();
+        } else {
+          hideError();
         }
-      });
+        actionBtn.disabled = !canAct;
+      }
 
-      // mouse interactions
-      keyListEl.addEventListener('mouseover', function(ev){
-        const t = ev.target.closest('[data-id]');
-        if(!t) return;
-        allItems = Array.from(keyListEl.children).filter(el => el.style.display !== 'none');
-        highlightIndex = allItems.indexOf(t);
-        refreshItems();
-      });
+      function showError(msg) {
+        errorMsg.textContent = msg;
+        errorMsg.classList.remove('hidden');
+      }
 
-      keyListEl.addEventListener('click', function(ev){
-        const t = ev.target.closest('[data-id]');
-        if(!t) return;
-        const id = t.getAttribute('data-id');
-        const name = t.textContent.trim();
-        inputEl.value = id;
-        searchEl.value = name;
-        hideList();
-      });
+      function hideError() {
+        errorMsg.textContent = '';
+        errorMsg.classList.add('hidden');
+      }
 
-      document.addEventListener('click', function(ev){
-        if(!ev.target.closest('#key-list') && !ev.target.closest('#key-search')){
-          hideList();
+      keySelect.addEventListener('change', function() {
+        var opt = this.options[this.selectedIndex];
+        selectedKeyId = this.value;
+        isPrivateKey = opt.getAttribute('data-is-private') === 'true';
+
+        if (!selectedKeyId) {
+          badge.classList.add('hidden');
+        } else {
+          badge.classList.remove('hidden');
+          if (isPrivateKey) {
+            badgeLabel.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-[#ff9e64]/15 text-[#ff9e64] border border-[#ff9e64]/25';
+            badgeLabel.textContent = 'Private Key';
+            badgeHint.textContent = 'Can encrypt and decrypt';
+          } else {
+            badgeLabel.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-[#9ece6a]/15 text-[#9ece6a] border border-[#9ece6a]/25';
+            badgeLabel.textContent = 'Public Key';
+            badgeHint.textContent = 'Can only encrypt';
+          }
         }
+        updateButtonState();
+      });
+
+      inputText.addEventListener('input', updateButtonState);
+
+      actionBtn.addEventListener('click', function() {
+        var endpoint = isDecryptMode ? '/decrypt' : '/encrypt';
+        actionBtn.disabled = true;
+        actionBtnText.textContent = 'Processing...';
+        hideError();
+
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ key: selectedKeyId, input: inputText.value })
+        })
+        .then(function(res) {
+          if (!res.ok) return res.text().then(function(t) { throw new Error(t.trim()); });
+          return res.text();
+        })
+        .then(function(text) {
+          outputText.value = text;
+        })
+        .catch(function(err) {
+          showError(err.message || 'An error occurred');
+        })
+        .finally(function() {
+          updateButtonState();
+        });
+      });
+
+      clearBtn.addEventListener('click', function() {
+        inputText.value = '';
+        outputText.value = '';
+        hideError();
+        updateButtonState();
       });
     })();
-  </script>
-  <script>
-    // Focus error alerts after HTMX swaps them into the DOM so screen readers notice
-    document.body.addEventListener('htmx:afterOnLoad', function(evt){
-      // prefer encrypt error if present
-      var el = document.getElementById('encrypt-error') || document.getElementById('decrypt-error');
-      if(el){
-        try{ el.focus(); }catch(e){}
-      }
-    });
-  </script>
+    </script>
+  </body>
 </html>

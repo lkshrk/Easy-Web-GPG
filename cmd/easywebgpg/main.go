@@ -53,10 +53,7 @@ func loadTemplates() *template.Template {
 }
 
 func main() {
-	// Run migrations via golang-migrate only when DATABASE_URL is set (postgres).
-	// For the default sqlite (local file) we skip golang-migrate at runtime and
-	// instead use the simple SQL executor below to avoid cgo sqlite driver issues
-	// inside minimal container images.
+	// Run golang-migrate migrations for PostgreSQL only.
 	if os.Getenv("DATABASE_URL") != "" {
 		if err := migratepkg.RunMigrations(); err != nil {
 			log.Fatalf("migration error: %v", err)
@@ -68,38 +65,34 @@ func main() {
 		log.Fatalf("db open: %v", err)
 	}
 
-	// Apply simple SQL migrations (development fallback)
-	// Try to find the migrations directory in various locations
+	// Apply simple SQL migrations (SQLite development fallback).
 	migrationPath := findDirectory("migrations", []string{"migrations/sql", "./migrations/sql", "../migrations/sql", "/migrations/sql"})
 	if err := dbpkg.ApplySQLMigrations(db, migrationPath); err != nil {
 		log.Printf("migration error (dev): %v", err)
 	}
 
-	// Provide DB to crypto package so it can store/read master salt
-	cm.SetDB(db)
-
-	// Load templates
+	cryptoSvc := cm.NewCryptoService(db)
 	tmpl := loadTemplates()
 
-	// Resolve static directory
 	staticDir := findDirectory("static", []string{"static", "./static", "../static", "../../static", "/static"})
-
 	fsHandler := http.FileServer(http.Dir(staticDir))
-	a := &app.App{DB: db, Templates: tmpl}
+
+	a := &app.App{DB: db, Templates: tmpl, Crypto: cryptoSvc}
 
 	http.Handle("/static/", http.StripPrefix("/static/", fsHandler))
-	http.HandleFunc("/", a.IndexHandler)
 	http.HandleFunc("/time", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte(time.Now().Format("15:04:05 MST — Jan 2 2006")))
 	})
-	http.HandleFunc("/keys", a.AddKeyHandler)
-	http.HandleFunc("/keys/view", a.ViewKeyHandler)
-	http.HandleFunc("/keys/delete", a.DeleteKeyHandler)
 	http.HandleFunc("/auth", a.AuthHandler)
 	http.HandleFunc("/logout", a.LogoutHandler)
-	http.HandleFunc("/encrypt", a.EncryptHandler)
-	http.HandleFunc("/decrypt", a.DecryptHandler)
+
+	http.HandleFunc("/", a.WithAuth(a.IndexHandler))
+	http.HandleFunc("/keys", a.WithAuth(a.AddKeyHandler))
+	http.HandleFunc("/keys/view", a.WithAuth(a.ViewKeyHandler))
+	http.HandleFunc("/keys/delete", a.WithAuth(a.DeleteKeyHandler))
+	http.HandleFunc("/encrypt", a.WithAuth(a.EncryptHandler))
+	http.HandleFunc("/decrypt", a.WithAuth(a.DecryptHandler))
 
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -1,12 +1,18 @@
-.PHONY: help build run test clean docker-build docker-run test-visual test-visual-setup test-visual-cleanup
+.PHONY: help build run test clean css css-watch docker-build docker-run test-visual test-visual-setup test-visual-cleanup dev dev-build dev-down dev-logs
 
 help:
 	@echo "Easy Web GPG"
 	@echo ""
 	@echo "Available targets:"
 	@echo "  build             - Build using Docker"
-	@echo "  run               - Run the application"
+	@echo "  run               - Run the application (builds CSS first)"
+	@echo "  dev               - Run development environment with live reload"
+	@echo "  dev-build         - Build development Docker images"
+	@echo "  dev-down          - Stop development environment"
+	@echo "  dev-logs          - Follow development logs"
 	@echo "  test              - Run Go tests"
+	@echo "  css               - Build Tailwind CSS (minified)"
+	@echo "  css-watch         - Watch and rebuild Tailwind CSS"
 	@echo "  test-visual       - Run visual regression tests (full comparison)"
 	@echo "  test-visual-setup - Setup containers for visual testing"
 	@echo "  test-visual-cleanup - Stop and remove visual test containers"
@@ -14,14 +20,47 @@ help:
 	@echo "  docker-build      - Build Docker image"
 	@echo "  docker-run        - Run Docker container"
 
+# Tailwind CSS standalone CLI
+TAILWIND_BIN := bin/tailwindcss
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+ifeq ($(UNAME_S),Darwin)
+  ifeq ($(UNAME_M),arm64)
+    TAILWIND_PLATFORM := macos-arm64
+  else
+    TAILWIND_PLATFORM := macos-x64
+  endif
+else
+  ifeq ($(UNAME_M),aarch64)
+    TAILWIND_PLATFORM := linux-arm64
+  else
+    TAILWIND_PLATFORM := linux-x64
+  endif
+endif
+
+$(TAILWIND_BIN):
+	@mkdir -p bin
+	@echo "Downloading Tailwind CSS standalone CLI..."
+	@curl -sLo $(TAILWIND_BIN) "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-$(TAILWIND_PLATFORM)"
+	@chmod +x $(TAILWIND_BIN)
+
+css: $(TAILWIND_BIN)
+	@mkdir -p static/dist
+	$(TAILWIND_BIN) -i static/css/input.css -o static/dist/styles.css --minify
+
+css-watch: $(TAILWIND_BIN)
+	@mkdir -p static/dist
+	$(TAILWIND_BIN) -i static/css/input.css -o static/dist/styles.css --watch
+
 build:
 	docker build --target binary-export --output bin/ .
 
-run:
-	docker compose up
+run: css
+	go run ./cmd/easywebgpg
 
 test:
-	go test ./...
+	go test -race ./...
 
 clean:
 	rm -rf bin/ static/dist/
@@ -72,7 +111,7 @@ test-visual-setup:
 		sleep 1; \
 	done
 	@echo ""
-	@echo "✓ Visual test environment ready!"
+	@echo "Visual test environment ready!"
 	@echo "  Main branch:    http://localhost:8081"
 	@echo "  Current branch: http://localhost:8080"
 
@@ -80,7 +119,7 @@ test-visual-cleanup:
 	@echo "Cleaning up visual regression test environment..."
 	@docker stop easy-web-gpg-main easy-web-gpg-current 2>/dev/null || true
 	@docker rm easy-web-gpg-main easy-web-gpg-current 2>/dev/null || true
-	@echo "✓ Cleanup complete"
+	@echo "Cleanup complete"
 
 test-visual: test-visual-setup
 	@echo ""
@@ -90,3 +129,24 @@ test-visual: test-visual-setup
 		npx playwright install --with-deps chromium --quiet && \
 		BASELINE_URL=http://localhost:8081 BASE_URL=http://localhost:8080 npm run test:visual
 	@$(MAKE) test-visual-cleanup
+
+dev-build:
+	@echo "Building development Docker images..."
+	@docker compose -f docker-compose.dev.yml build
+
+dev:
+	@echo "Starting development environment with live reload..."
+	@echo ""
+	@echo "  App:        http://localhost:8080"
+	@echo "  Password:   $${MASTER_PASSWORD:-changeme}"
+	@echo ""
+	@echo "Changes to Go files, templates, and CSS will trigger automatic reloads."
+	@echo "Press Ctrl+C to stop."
+	@echo ""
+	@docker compose -f docker-compose.dev.yml up
+
+dev-down:
+	@docker compose -f docker-compose.dev.yml down
+
+dev-logs:
+	@docker compose -f docker-compose.dev.yml logs -f

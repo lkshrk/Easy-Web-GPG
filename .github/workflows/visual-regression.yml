@@ -1,13 +1,36 @@
-name: Visual Regression
+name: CI Pipeline
 
 on:
   push:
-    branches: ["**"]
+    branches:
+      - '**'
   pull_request:
-    branches: ["**"]
+    branches:
+      - '**'
   workflow_dispatch:
 
 jobs:
+  go-tests:
+    name: Go Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v5
+        if: github.event_name != 'pull_request'
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: false
+
   skip_notice:
     if: ${{ (github.event.head_commit && contains(github.event.head_commit.message, '[ui-change]')) || (github.event.commits && contains(toJSON(github.event.commits), '[ui-change]')) }}
     name: Skipped Visual Tests Notice
@@ -23,20 +46,20 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout current branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: current
 
       - name: Checkout main branch
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: main
           path: main
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: current/tests/package-lock.json
 
@@ -44,9 +67,28 @@ jobs:
         working-directory: current/tests
         run: npm ci
 
+      - name: Get Playwright version
+        id: playwright-version
+        run: |
+          VERSION=$(node -p "require('./current/tests/node_modules/@playwright/test/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
         working-directory: current/tests
         run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: Install Playwright system deps only
+        working-directory: current/tests
+        run: npx playwright install-deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
 
       - name: Build main branch Docker image
         if: github.ref != 'refs/heads/main'
@@ -66,7 +108,6 @@ jobs:
             -e MASTER_PASSWORD="test-password" \
             easy-web-gpg:main
 
-          # Wait for app to be ready
           for i in {1..30}; do
             if curl -f http://localhost:8081/time > /dev/null 2>&1; then
               echo "Main branch application is ready"
@@ -89,7 +130,6 @@ jobs:
             -e MASTER_PASSWORD="test-password" \
             easy-web-gpg:current
 
-          # Wait for app to be ready
           for i in {1..30}; do
             if curl -f http://localhost:8080/time > /dev/null 2>&1; then
               echo "Current branch application is ready"
@@ -122,12 +162,12 @@ jobs:
       - name: Stop applications
         if: always()
         run: |
-          docker logs easy-web-gpg-main || true
-          docker stop easy-web-gpg-main || true
-          docker rm easy-web-gpg-main || true
-          docker logs easy-web-gpg-current || true
-          docker stop easy-web-gpg-current || true
-          docker rm easy-web-gpg-current || true
+          docker logs easy-web-gpg-main 2>/dev/null || true
+          docker stop easy-web-gpg-main 2>/dev/null || true
+          docker rm easy-web-gpg-main 2>/dev/null || true
+          docker logs easy-web-gpg-current 2>/dev/null || true
+          docker stop easy-web-gpg-current 2>/dev/null || true
+          docker rm easy-web-gpg-current 2>/dev/null || true
 
       - name: Upload visual comparison artifacts
         if: always()
@@ -142,7 +182,7 @@ jobs:
 
       - name: Comment PR with results
         if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const run_url = `${context.payload.repository.html_url}/actions/runs/${context.runId}`;

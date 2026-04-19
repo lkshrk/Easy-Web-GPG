@@ -32,9 +32,28 @@ Open http://localhost:8080
 
 ## Development
 
+### Live Reload (Recommended)
+
+```bash
+export MASTER_PASSWORD=test123
+make dev
+```
+
+This starts a development environment with:
+- **Automatic Go rebuild** on code changes
+- **Live CSS recompilation** with Tailwind
+- **Template hot reload**
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development guide.
+
+### Other Commands
+
 ```bash
 # Run tests
 make test
+
+# Run visual regression tests
+make test-visual
 
 # Build binary
 make build

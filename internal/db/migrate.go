@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -10,7 +10,9 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// ApplySQLMigrations applies SQL files in migrations/sql in ascending order.
+// ApplySQLMigrations is a simple SQL file executor for SQLite development
+// environments. For PostgreSQL production deployments, use the golang-migrate
+// based RunMigrations in internal/migrate instead.
 func ApplySQLMigrations(db *sqlx.DB, migrationsDir string) error {
 	files, err := filepath.Glob(filepath.Join(migrationsDir, "*.sql"))
 	if err != nil {
@@ -18,7 +20,7 @@ func ApplySQLMigrations(db *sqlx.DB, migrationsDir string) error {
 	}
 	sort.Strings(files)
 	for _, f := range files {
-		b, err := ioutil.ReadFile(f)
+		b, err := os.ReadFile(f)
 		if err != nil {
 			return err
 		}

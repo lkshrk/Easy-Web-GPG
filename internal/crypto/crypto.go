@@ -6,11 +6,13 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,13 +23,25 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+// ErrMasterPasswordNotSet is returned when MASTER_PASSWORD env var is empty.
 var ErrMasterPasswordNotSet = errors.New("MASTER_PASSWORD not set")
 
 const defaultSaltFile = "./data/master_salt"
 
-// argon2Params returns (time, memoryKB, threads)
+// CryptoService provides encryption, decryption, and authentication
+// operations using a master password and a persisted salt.
+type CryptoService struct {
+	db *sqlx.DB
+}
+
+// NewCryptoService creates a CryptoService backed by the given database
+// for salt persistence. The DB may be nil for file-based salt fallback.
+func NewCryptoService(db *sqlx.DB) *CryptoService {
+	return &CryptoService{db: db}
+}
+
+// argon2Params returns (time, memoryKB, threads) from env or defaults.
 func argon2Params() (uint32, uint32, uint8) {
-	// defaults: time=1, memory=32MB, threads=2
 	t := uint32(1)
 	m := uint32(32 * 1024)
 	th := uint8(2)
@@ -49,33 +63,37 @@ func argon2Params() (uint32, uint32, uint8) {
 	return t, m, th
 }
 
-var sqlDB *sqlx.DB
+func deriveKey(password string, salt []byte) []byte {
+	t, m, th := argon2Params()
+	return argon2.IDKey([]byte(password), salt, t, m, th, 32)
+}
 
-// readOrCreateSalt reads the salt from the configured DB (if SetDB was called)
-// and falls back to a local file if no DB is configured.
-func readOrCreateSalt() ([]byte, error) {
-	if sqlDB != nil {
+// readOrCreateSalt reads the salt from the DB or falls back to a local file.
+func (cs *CryptoService) readOrCreateSalt() ([]byte, error) {
+	if cs.db != nil {
 		var val string
-		q := sqlDB.Rebind("SELECT value FROM secrets WHERE name = ? LIMIT 1")
-		err := sqlDB.Get(&val, q, "master_salt")
+		q := cs.db.Rebind("SELECT value FROM secrets WHERE name = ? LIMIT 1")
+		err := cs.db.Get(&val, q, "master_salt")
 		if err == nil {
 			s, err := base64.StdEncoding.DecodeString(strings.TrimSpace(val))
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to decode master_salt: %w", err)
 			}
 			return s, nil
 		}
-		// Not found, create and store
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("failed to read master_salt from DB: %w", err)
+		}
 		s := make([]byte, 16)
 		if _, err := rand.Read(s); err != nil {
 			return nil, err
 		}
 		enc := base64.StdEncoding.EncodeToString(s)
-		_, err = sqlDB.NamedExec("INSERT INTO secrets (name, value) VALUES (:name, :value)", map[string]interface{}{"name": "master_salt", "value": enc})
+		_, err = cs.db.NamedExec("INSERT INTO secrets (name, value) VALUES (:name, :value)", map[string]interface{}{"name": "master_salt", "value": enc})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to insert master_salt: %w", err)
 		}
-		fmt.Fprintf(os.Stderr, "INFO: generated master salt and stored in DB (secrets.name=master_salt); keep DB backups\n")
+		log.Printf("INFO: generated master salt and stored in DB (secrets.name=master_salt); keep DB backups")
 		return s, nil
 	}
 
@@ -91,7 +109,6 @@ func readOrCreateSalt() ([]byte, error) {
 		}
 		return s, nil
 	}
-	// create parent dir
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
@@ -107,52 +124,37 @@ func readOrCreateSalt() ([]byte, error) {
 	return s, nil
 }
 
-// SetDB provides the database connection the crypto package should use for
-// persisting and reading the master salt. Call this after applying migrations.
-func SetDB(db *sqlx.DB) {
-	sqlDB = db
-}
-
-func deriveKey(password string, salt []byte) []byte {
-	t, m, th := argon2Params()
-	return argon2.IDKey([]byte(password), salt, t, m, th, 32)
-}
-
-// VerifyMasterPassword derives a key from the candidate password using the
-// persisted salt and compares it to the derived key from the configured
-// MASTER_PASSWORD. Returns true when they match.
-func VerifyMasterPassword(candidate string) (bool, error) {
-	if os.Getenv("MASTER_PASSWORD") == "" {
-		return false, ErrMasterPasswordNotSet
-	}
-	salt, err := readOrCreateSalt()
-	if err != nil {
-		return false, err
-	}
-	derivedCandidate := deriveKey(candidate, salt)
-	derivedReal := deriveKey(os.Getenv("MASTER_PASSWORD"), salt)
-	if hmac.Equal(derivedCandidate, derivedReal) {
-		return true, nil
-	}
-	return false, nil
-}
-
 // masterKey derives the 32-byte master key from MASTER_PASSWORD and persisted salt.
-func masterKey() ([]byte, error) {
+func (cs *CryptoService) masterKey() ([]byte, error) {
 	pass := os.Getenv("MASTER_PASSWORD")
 	if pass == "" {
 		return nil, ErrMasterPasswordNotSet
 	}
-	salt, err := readOrCreateSalt()
+	salt, err := cs.readOrCreateSalt()
 	if err != nil {
 		return nil, err
 	}
 	return deriveKey(pass, salt), nil
 }
 
-// Encrypt plaintext and return base64(nonce|ciphertext)
-func Encrypt(plaintext []byte) (string, error) {
-	key, err := masterKey()
+// VerifyMasterPassword compares a candidate password against MASTER_PASSWORD
+// using argon2 key derivation with the persisted salt.
+func (cs *CryptoService) VerifyMasterPassword(candidate string) (bool, error) {
+	if os.Getenv("MASTER_PASSWORD") == "" {
+		return false, ErrMasterPasswordNotSet
+	}
+	salt, err := cs.readOrCreateSalt()
+	if err != nil {
+		return false, err
+	}
+	derivedCandidate := deriveKey(candidate, salt)
+	derivedReal := deriveKey(os.Getenv("MASTER_PASSWORD"), salt)
+	return hmac.Equal(derivedCandidate, derivedReal), nil
+}
+
+// Encrypt encrypts plaintext and returns base64(nonce|ciphertext).
+func (cs *CryptoService) Encrypt(plaintext []byte) (string, error) {
+	key, err := cs.masterKey()
 	if err != nil {
 		return "", err
 	}
@@ -173,9 +175,9 @@ func Encrypt(plaintext []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(out), nil
 }
 
-// Decrypt base64(nonce|ciphertext)
-func Decrypt(b64 string) ([]byte, error) {
-	key, err := masterKey()
+// Decrypt decodes base64(nonce|ciphertext) and returns plaintext.
+func (cs *CryptoService) Decrypt(b64 string) ([]byte, error) {
+	key, err := cs.masterKey()
 	if err != nil {
 		return nil, err
 	}
@@ -204,12 +206,10 @@ func Decrypt(b64 string) ([]byte, error) {
 	return pt, nil
 }
 
-// CreateAuthCookieValue creates a signed timestamp token used for the auth cookie.
-// The returned value is of the form "<ts>:<hex-hmac>" where HMAC is computed
-// using the master key as secret. The token is valid when verified and the
-// timestamp is within the allowed window.
-func CreateAuthCookieValue() (string, error) {
-	key, err := masterKey()
+// CreateAuthCookieValue creates a signed timestamp token for the auth cookie.
+// Format: "<unix_ts>:<hex_hmac>" signed with the master key.
+func (cs *CryptoService) CreateAuthCookieValue() (string, error) {
+	key, err := cs.masterKey()
 	if err != nil {
 		return "", err
 	}
@@ -221,10 +221,10 @@ func CreateAuthCookieValue() (string, error) {
 	return payload + ":" + hex.EncodeToString(sig), nil
 }
 
-// VerifyAuthCookieValue verifies a cookie value created by CreateAuthCookieValue
-// and checks that the timestamp is not older than maxAge (seconds).
-func VerifyAuthCookieValue(val string, maxAgeSeconds int64) bool {
-	key, err := masterKey()
+// VerifyAuthCookieValue verifies a cookie value and checks the timestamp
+// is not older than maxAgeSeconds.
+func (cs *CryptoService) VerifyAuthCookieValue(val string, maxAgeSeconds int64) bool {
+	key, err := cs.masterKey()
 	if err != nil {
 		return false
 	}
@@ -248,8 +248,5 @@ func VerifyAuthCookieValue(val string, maxAgeSeconds int64) bool {
 	if err != nil {
 		return false
 	}
-	if time.Now().Unix()-ts > maxAgeSeconds {
-		return false
-	}
-	return true
+	return time.Now().Unix()-ts <= maxAgeSeconds
 }
