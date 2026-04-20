@@ -20,7 +20,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/${{ lowercase(github.event.repository.name) }}
+  IMAGE_NAME: ${{ github.repository_owner }}/easy-web-gpg
 
 permissions:
   contents: write
