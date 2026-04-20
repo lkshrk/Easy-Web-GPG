@@ -10,6 +10,7 @@ github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f h1:tCbYj7/299ek
 github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f/go.mod h1:gcr0kNtGBqin9zDW9GOHcVntrwnjrK+qdJ06mWYBybw=
 github.com/ProtonMail/gopenpgp/v2 v2.10.0 h1:llCzLvntC9+iH+if/na4AgKTef/Zm4vpaRrR3+JdKvo=
 github.com/ProtonMail/gopenpgp/v2 v2.10.0/go.mod h1:dc0h9Pg3ftfN0U4pfRzujilfh61A2R52wgMkZWcWm2I=
+github.com/ProtonMail/gopenpgp/v3 v3.4.0/go.mod h1:bGdV9f6edhmd581wzXsQCTKdH8bXBbyhkgDKPjwPc6U=
 github.com/cloudflare/circl v1.6.3 h1:9GPOhQGF9MCYUeXyMYlqTR6a5gTrgR/fBLXvUgtVcg8=
 github.com/cloudflare/circl v1.6.3/go.mod h1:2eXP6Qfat4O/Yhh8BznvKnJ+uzEoTQ6jVKJRn81BiS4=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=

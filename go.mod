@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/ProtonMail/gopenpgp/v2 v2.10.0
+	github.com/ProtonMail/gopenpgp/v3 v3.4.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jackc/pgx/v5 v5.9.2
