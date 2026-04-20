@@ -44,8 +44,8 @@ func RunMigrations() error {
 
 	// If dirty, reset to clean state (version - 1 ensures we can re-run the migration)
 	if dirty {
-		// For version 0, we need to force to -1 (no migrations applied)
-		forceVersion := int(version) - 1
+		// Force to version 0 (no migrations applied)
+		forceVersion := 0
 		if err := m.Force(forceVersion); err != nil {
 			return fmt.Errorf("migrate force clean from %d to %d: %w", version, forceVersion, err)
 		}
