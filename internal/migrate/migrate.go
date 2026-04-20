@@ -36,6 +36,19 @@ func RunMigrations() error {
 		return fmt.Errorf("migrate new: %w", err)
 	}
 
+	// Get current version to check if we need to force version
+	version, dirty, err := m.Version()
+	if err != nil && err != migrate.ErrNilVersion {
+		return fmt.Errorf("migrate version: %w", err)
+	}
+
+	// If dirty, reset to clean state
+	if dirty {
+		if err := m.Force(version - 1); err != nil {
+			return fmt.Errorf("migrate force clean: %w", err)
+		}
+	}
+
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("migrate up: %w", err)
 	}
