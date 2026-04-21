@@ -3,8 +3,8 @@ import { defineConfig } from '@playwright/test';
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:8080';
 
 export default defineConfig({
-  testDir: '.',
-  timeout: 60_000,
+  testDir: './e2e',
+  timeout: 15_000,
   workers: process.env.CI ? 2 : 4,
   retries: process.env.CI ? 1 : 0,
   use: {
