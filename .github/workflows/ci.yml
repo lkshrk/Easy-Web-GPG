@@ -79,7 +79,7 @@ jobs:
         env:
           BASE_URL: http://localhost:8080
           MASTER_PASSWORD: test-password
-        run: npx playwright test e2e/app.spec.ts --reporter=github
+        run: npx playwright test e2e/app.spec.ts --reporter=list
 
       - name: Stop application
         if: always()
