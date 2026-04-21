@@ -53,26 +53,15 @@ jobs:
         working-directory: ./tests
         run: npx playwright install --with-deps chromium
 
-      - name: Build application
-        run: |
-          go mod download
-          go build -o bin/easywebgpg ./cmd/easywebgpg
+      - name: Build Docker image
+        run: docker build -t easy-web-gpg:test .
 
-      - name: Build CSS
-        working-directory: ./tests
+      - name: Start application container
         run: |
-          curl -sLo tailwindcss "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64"
-          chmod +x tailwindcss
-          mkdir -p ../static/dist
-          ./tailwindcss -i ../static/css/input.css -o ../static/dist/styles.css --minify
-
-      - name: Start application
-        run: |
-          export MASTER_PASSWORD=test-password
-          export PORT=8080
-          ./bin/easywebgpg &
-          APP_PID=$!
-          echo "APP_PID=$APP_PID" >> $GITHUB_ENV
+          docker run -d --name easy-web-gpg-test \
+            -p 8080:8080 \
+            -e MASTER_PASSWORD=test-password \
+            easy-web-gpg:test
 
       - name: Wait for application
         run: |
@@ -93,10 +82,7 @@ jobs:
 
       - name: Stop application
         if: always()
-        run: |
-          if [ -n "$APP_PID" ]; then
-            kill $APP_PID || true
-          fi
+        run: docker stop easy-web-gpg-test || true
 
       - name: Upload test results
         if: always()
