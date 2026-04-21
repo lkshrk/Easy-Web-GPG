@@ -17,7 +17,7 @@ import (
 
 	apppkg "h-cloud.io/web-gpg/internal/app"
 	cm "h-cloud.io/web-gpg/internal/crypto"
-	dbpkg "h-cloud.io/web-gpg/internal/db"
+	migratepkg "h-cloud.io/web-gpg/internal/migrate"
 )
 
 // setupTestApp creates a fully wired App with in-memory SQLite, migrations,
@@ -28,13 +28,19 @@ func setupTestApp(t *testing.T) (*apppkg.App, *sqlx.DB) {
 	t.Setenv("MASTER_PASSWORD", "test-master-password")
 	t.Setenv("MASTER_SALT_FILE", t.TempDir()+"/master_salt")
 
-	db, err := sqlx.Open("sqlite", "file::memory:?mode=memory&cache=shared&_busy_timeout=5000")
+	// Use temporary file for SQLite since golang-migrate doesn't support in-memory
+	tmpDir := t.TempDir()
+	dbPath := tmpDir + "/test.db"
+	t.Setenv("DATABASE_URL", "sqlite3://file:"+dbPath+"?_foreign_keys=1")
+
+	db, err := sqlx.Open("sqlite", "file:"+dbPath+"?_foreign_keys=1&_busy_timeout=5000")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
 
-	if err := dbpkg.ApplySQLMigrations(db, "../../migrations/sql"); err != nil {
+	// Use golang-migrate for proper schema handling
+	if err := migratepkg.RunMigrations(); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 

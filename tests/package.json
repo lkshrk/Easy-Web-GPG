@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:visual": "playwright test"
+    "test": "playwright test",
+    "test:visual": "playwright test visual.spec.ts",
+    "test:app": "playwright test app.spec.ts",
+    "test:headed": "playwright test --headed"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.1",

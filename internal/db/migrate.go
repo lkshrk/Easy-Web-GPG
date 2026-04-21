@@ -14,7 +14,7 @@ import (
 // environments. For PostgreSQL production deployments, use the golang-migrate
 // based RunMigrations in internal/migrate instead.
 func ApplySQLMigrations(db *sqlx.DB, migrationsDir string) error {
-	files, err := filepath.Glob(filepath.Join(migrationsDir, "*.sql"))
+	files, err := filepath.Glob(filepath.Join(migrationsDir, "*.up.sql"))
 	if err != nil {
 		return err
 	}

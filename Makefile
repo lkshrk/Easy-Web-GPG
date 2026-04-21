@@ -1,4 +1,4 @@
-.PHONY: help build run test clean css css-watch docker-build docker-run test-visual test-visual-setup test-visual-cleanup dev dev-build dev-down dev-logs
+.PHONY: help build run test test-docker clean css css-watch docker-build docker-run test-visual test-visual-setup test-visual-cleanup dev dev-build dev-down dev-logs
 
 help:
 	@echo "Easy Web GPG"
@@ -10,7 +10,8 @@ help:
 	@echo "  dev-build         - Build development Docker images"
 	@echo "  dev-down          - Stop development environment"
 	@echo "  dev-logs          - Follow development logs"
-	@echo "  test              - Run Go tests"
+	@echo "  test              - Run Go tests (requires local Go)"
+	@echo "  test-docker       - Run all tests in Docker (no dependencies)"
 	@echo "  css               - Build Tailwind CSS (minified)"
 	@echo "  css-watch         - Watch and rebuild Tailwind CSS"
 	@echo "  test-visual       - Run visual regression tests (full comparison)"
@@ -61,6 +62,33 @@ run: css
 
 test:
 	go test -race ./...
+
+test-docker:
+	@echo "Running all tests in Docker (no local dependencies)..."
+	@echo ""
+	@echo "Building application image..."
+	docker build -t easy-web-gpg:latest .
+	@echo ""
+	@echo "Running Go tests..."
+	docker build --target go-test -t easy-web-gpg:test-go -f Dockerfile.test .
+	@echo ""
+	@echo "Running E2E tests..."
+	@docker run -d --name easy-web-gpg-test-app \
+		-p 8080:8080 \
+		-e MASTER_PASSWORD="test-password" \
+		easy-web-gpg:latest; \
+	for i in $$(seq 1 30); do \
+		if curl -sf http://localhost:8080/ > /dev/null 2>&1; then \
+			echo "Application ready"; \
+			break; \
+		fi; \
+		sleep 1; \
+	done; \
+	docker build --target playwright-test -t easy-web-gpg:test-e2e -f Dockerfile.test .; \
+	docker stop easy-web-gpg-test-app > /dev/null 2>&1; \
+	docker rm easy-web-gpg-test-app > /dev/null 2>&1; \
+	echo ""
+	@echo "✓ All tests completed"
 
 clean:
 	rm -rf bin/ static/dist/
