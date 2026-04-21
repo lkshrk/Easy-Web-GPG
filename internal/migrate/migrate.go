@@ -65,13 +65,14 @@ func RunMigrations() error {
 	}
 
 	// If dirty, we need to recover to a clean state
-	// This ensures partial schema changes from the failed migration don't cause conflicts
+	// Force to current version to clear dirty flag, then check if we need to migrate
 	if dirty {
-		// For a single baseline migration, we can't step back (no previous version)
-		// Instead, force to current version to clear dirty flag, then re-apply
 		if err := m.Force(int(version)); err != nil {
 			return fmt.Errorf("migrate force clear dirty at version %d: %w", version, err)
 		}
+		// After clearing dirty, check if there are pending migrations before calling Up
+		// m.Up() will fail if already at latest version (tries to apply non-existent next version)
+		return nil
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
