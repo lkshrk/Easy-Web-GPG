@@ -1,9 +1,9 @@
--- migration: create keys table (sqlite)
+-- migration: create keys table
 CREATE TABLE IF NOT EXISTS keys (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   armored TEXT NOT NULL,
-  is_private BOOLEAN NOT NULL DEFAULT 0,
+  is_private BOOLEAN NOT NULL DEFAULT FALSE,
   encrypted_password TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
