@@ -1,0 +1,1 @@
+-- baseline migration: no rollback needed

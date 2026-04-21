@@ -52,12 +52,8 @@ func TestMigrationsExist(t *testing.T) {
 
 	// Check for expected migration files
 	expectedFiles := map[string]bool{
-		"1_create_keys.up.sql":           false,
-		"1_create_keys.down.sql":          false,
-		"2_add_password_bcrypt.up.sql":    false,
-		"2_add_password_bcrypt.down.sql":   false,
-		"3_create_secrets.up.sql":         false,
-		"3_create_secrets.down.sql":        false,
+		"000001_baseline.up.sql":   false,
+		"000001_baseline.down.sql": false,
 	}
 
 	for _, entry := range entries {

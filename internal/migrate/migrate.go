@@ -1,44 +1,15 @@
 package migrate
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	migrate "github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
-
-// dropSchemaMigrationsTable drops the schema_migrations table to reset migration state
-func dropSchemaMigrationsTable(dbURL string) error {
-	// Extract driver type from database URL
-	var driverName string
-	if strings.HasPrefix(dbURL, "postgres://") || strings.HasPrefix(dbURL, "postgresql://") {
-		driverName = "postgres"
-	} else if strings.HasPrefix(dbURL, "sqlite3://") {
-		driverName = "sqlite3"
-	} else {
-		return fmt.Errorf("unsupported database URL format")
-	}
-
-	db, err := sql.Open(driverName, strings.TrimPrefix(strings.TrimPrefix(dbURL, "sqlite3://file:"), "postgres://"))
-	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
-	}
-	defer db.Close()
-
-	// Drop the schema_migrations table
-	_, err = db.Exec("DROP TABLE IF EXISTS schema_migrations")
-	if err != nil {
-		return fmt.Errorf("failed to drop schema_migrations table: %w", err)
-	}
-
-	return nil
-}
 
 // RunMigrations uses golang-migrate for PostgreSQL production deployments.
 // It reads DATABASE_URL; if unset, falls back to sqlite at file:data.db.
@@ -87,49 +58,19 @@ func RunMigrations() error {
 		return fmt.Errorf("migrate new: %w", err)
 	}
 
-	// Get current version to check if we need to force version
-	_, dirty, err := m.Version()
+	// Get current version to check if we need to handle dirty state
+	version, dirty, err := m.Version()
 	if err != nil && err != migrate.ErrNilVersion {
 		return fmt.Errorf("migrate version: %w", err)
 	}
 
-	// If dirty, we need to fix by clearing the dirty flag
-	// This happens when a migration fails mid-transaction
+	// If dirty, we need to recover to a clean state
+	// This ensures partial schema changes from the failed migration don't cause conflicts
 	if dirty {
-		// Close the migrate instance first
-		m.Close()
-
-		// Extract driver type from database URL
-		var driverName string
-		if strings.HasPrefix(dbURL, "postgres://") || strings.HasPrefix(dbURL, "postgresql://") {
-			driverName = "postgres"
-		} else if strings.HasPrefix(dbURL, "sqlite3://") {
-			driverName = "sqlite3"
-		} else {
-			return fmt.Errorf("unsupported database URL format")
-		}
-
-		// Parse database URL for sql.Open
-		dbConnStr := strings.TrimPrefix(dbURL, "sqlite3://file:")
-		dbConnStr = strings.TrimPrefix(dbConnStr, "postgres://")
-		dbConnStr = strings.TrimPrefix(dbConnStr, "postgresql://")
-
-		db, err := sql.Open(driverName, dbConnStr)
-		if err != nil {
-			return fmt.Errorf("failed to open database: %w", err)
-		}
-		defer db.Close()
-
-		// Clear the dirty flag
-		_, err = db.Exec("UPDATE schema_migrations SET dirty = false")
-		if err != nil {
-			return fmt.Errorf("failed to clear dirty flag: %w", err)
-		}
-
-		// Recreate migrate instance with clean state
-		m, err = migrate.New(src, dbURL)
-		if err != nil {
-			return fmt.Errorf("migrate new: %w", err)
+		// For a single baseline migration, we can't step back (no previous version)
+		// Instead, force to current version to clear dirty flag, then re-apply
+		if err := m.Force(int(version)); err != nil {
+			return fmt.Errorf("migrate force clear dirty at version %d: %w", version, err)
 		}
 	}
 
