@@ -15,21 +15,18 @@ import (
 // It reads DATABASE_URL; if unset, falls back to sqlite at file:data.db.
 // For SQLite development environments, use ApplySQLMigrations in internal/db instead.
 func RunMigrations() error {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		// sqlite3 URL for golang-migrate: sqlite3://file:data.db?cache=shared&_foreign_keys=1
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("getwd: %w", err)
-		}
-		dbPath := cwd + "/data.db"
-		dbURL = "sqlite3://file:" + dbPath + "?_foreign_keys=1"
-	}
-
 	// Get repository root by going up from the current directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("getwd: %w", err)
+	}
+
+	// Build SQLite path if DATABASE_URL not set
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		// sqlite3 URL for golang-migrate: sqlite3://file:data.db?cache=shared&_foreign_keys=1
+		dbPath := cwd + "/data.db"
+		dbURL = "sqlite3://file:" + dbPath + "?_foreign_keys=1"
 	}
 
 	// Try to find migrations directory relative to current directory
@@ -70,9 +67,7 @@ func RunMigrations() error {
 		if err := m.Force(int(version)); err != nil {
 			return fmt.Errorf("migrate force clear dirty at version %d: %w", version, err)
 		}
-		// After clearing dirty, check if there are pending migrations before calling Up
-		// m.Up() will fail if already at latest version (tries to apply non-existent next version)
-		return nil
+		// Continue to check for pending migrations below
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
