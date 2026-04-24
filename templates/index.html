@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/static/dist/styles.css" />
   </head>
   <body class="bg-[#1a1b26] min-h-screen text-[#c0caf5]">
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- Top bar -->
     <header class="border-b border-[#292e42] px-6 py-3 flex items-center justify-between">
@@ -70,7 +72,7 @@
         <!-- Add key form -->
         <div class="bg-[#24283b] rounded-lg border border-[#292e42] p-5 mb-6">
           <h3 class="text-xs text-[#565f89] uppercase tracking-wider mb-4">Add New Key</h3>
-          <form action="/keys" method="post" class="space-y-3">
+          <form id="add-key-form" action="/keys" method="post" class="space-y-3">
             <div>
               <label for="key-name" class="block text-xs text-[#565f89] mb-1">Name</label>
               <input id="key-name" name="name" required
@@ -109,9 +111,9 @@
               {{end}}
               <span class="text-xs text-[#565f89] truncate">{{.CreatedAt}}</span>
             </div>
-            <form method="post" action="/keys/delete" class="shrink-0 ml-3">
+            <form method="post" action="/keys/delete" class="shrink-0 ml-3 delete-key-form">
               <input type="hidden" name="id" value="{{.ID}}" />
-              <button type="submit" onclick="return confirm('Delete this key?')"
+              <button type="submit"
                 class="text-xs text-[#565f89] hover:text-[#f7768e] transition-colors opacity-0 group-hover:opacity-100">Delete</button>
             </form>
           </div>
@@ -125,6 +127,49 @@
 
     <script>
     (function() {
+      // ── Toast system ──────────────────────────────────────────────────────────
+      var toastContainer = document.getElementById('toast-container');
+
+      function showToast(message, type) {
+        var isSuccess = type === 'success';
+        var toast = document.createElement('div');
+        toast.className = [
+          'pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-md border text-sm shadow-lg',
+          'translate-x-full transition-transform duration-300',
+          isSuccess
+            ? 'bg-[#9ece6a]/10 border-[#9ece6a]/30 text-[#9ece6a]'
+            : 'bg-[#f7768e]/10 border-[#f7768e]/30 text-[#f7768e]'
+        ].join(' ');
+        toast.style.minWidth = '220px';
+        toast.style.maxWidth = '340px';
+
+        var icon = document.createElement('span');
+        icon.textContent = isSuccess ? '✓' : '✕';
+        icon.className = 'font-bold shrink-0 mt-px';
+
+        var text = document.createElement('span');
+        text.textContent = message;
+        text.className = 'leading-snug';
+
+        toast.appendChild(icon);
+        toast.appendChild(text);
+        toastContainer.appendChild(toast);
+
+        // Slide in
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            toast.classList.remove('translate-x-full');
+          });
+        });
+
+        // Auto-dismiss
+        setTimeout(function() {
+          toast.classList.add('translate-x-full');
+          toast.addEventListener('transitionend', function() { toast.remove(); });
+        }, type === 'success' ? 2500 : 4000);
+      }
+
+      // ── Crypto operations ─────────────────────────────────────────────────────
       var keySelect = document.getElementById('key-select');
       var badge = document.getElementById('key-badge');
       var badgeLabel = document.getElementById('key-badge-label');
@@ -236,6 +281,77 @@
         outputText.value = '';
         hideError();
         updateButtonState();
+      });
+
+      // ── Add key form (fetch, no page nav) ────────────────────────────────────
+      var addKeyForm = document.getElementById('add-key-form');
+      if (addKeyForm) {
+        addKeyForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          var submitBtn = addKeyForm.querySelector('[type="submit"]');
+          var origText = submitBtn.textContent;
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Adding…';
+
+          fetch('/keys', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams(new FormData(addKeyForm)),
+            redirect: 'manual'
+          })
+          .then(function(res) {
+            // 303 redirect = success; opaqueredirect = followed 303 manually
+            if (res.type === 'opaqueredirect' || res.status === 303 || res.ok) {
+              showToast('Key added successfully', 'success');
+              addKeyForm.reset();
+              setTimeout(function() { location.reload(); }, 1200);
+            } else {
+              return res.text().then(function(t) {
+                throw new Error(t.trim() || 'Failed to add key');
+              });
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to add key', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = origText;
+          });
+        });
+      }
+
+      // ── Delete key forms (fetch, no page nav) ────────────────────────────────
+      document.querySelectorAll('.delete-key-form').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+          e.preventDefault();
+          if (!confirm('Delete this key?')) return;
+
+          var row = form.closest('[data-key-row]') || form.closest('.flex.items-center.justify-between');
+          var keyName = row ? (row.querySelector('.text-sm.font-medium') || {}).textContent : 'key';
+
+          fetch('/keys/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams(new FormData(form)),
+            redirect: 'manual'
+          })
+          .then(function(res) {
+            if (res.type === 'opaqueredirect' || res.status === 303 || res.ok) {
+              showToast((keyName || 'Key') + ' deleted', 'success');
+              if (row) {
+                row.style.transition = 'opacity 0.25s';
+                row.style.opacity = '0';
+                setTimeout(function() { row.remove(); }, 250);
+              }
+            } else {
+              return res.text().then(function(t) {
+                throw new Error(t.trim() || 'Failed to delete key');
+              });
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to delete key', 'error');
+          });
+        });
       });
     })();
     </script>
