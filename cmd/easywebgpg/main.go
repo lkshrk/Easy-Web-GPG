@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +15,21 @@ import (
 	dbpkg "h-cloud.io/web-gpg/internal/db"
 	migratepkg "h-cloud.io/web-gpg/internal/migrate"
 )
+
+func initLogger() {
+	level := slog.LevelInfo
+	if os.Getenv("LOG_LEVEL") == "debug" {
+		level = slog.LevelDebug
+	}
+	opts := &slog.HandlerOptions{Level: level}
+	var handler slog.Handler
+	if os.Getenv("LOG_FORMAT") == "json" {
+		handler = slog.NewJSONHandler(os.Stdout, opts)
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, opts)
+	}
+	slog.SetDefault(slog.New(handler))
+}
 
 // findFile returns the first existing file path from candidates.
 func findFile(candidates []string) string {
@@ -33,7 +48,7 @@ func findDirectory(name string, candidates []string) string {
 			return c
 		}
 	}
-	log.Printf("warning: %s directory not found; using default", name)
+	slog.Warn("directory not found, using default", "name", name, "default", candidates[0])
 	return candidates[0]
 }
 
@@ -44,7 +59,8 @@ func loadTemplates() *template.Template {
 
 	indexPath := findFile(indexCandidates)
 	if indexPath == "" {
-		log.Fatalf("templates/index.html not found in candidate paths")
+		slog.Error("templates/index.html not found in candidate paths")
+		os.Exit(1)
 	}
 
 	files := []string{indexPath}
@@ -52,26 +68,33 @@ func loadTemplates() *template.Template {
 		files = append(files, loginPath)
 	}
 
-	return template.Must(template.ParseFiles(files...))
+	tmpl := template.Must(template.ParseFiles(files...))
+	slog.Debug("templates loaded", "files", files)
+	return tmpl
 }
 
 func main() {
-	// Run golang-migrate migrations for PostgreSQL only.
+	initLogger()
+
+	dbMode := "sqlite"
 	if os.Getenv("DATABASE_URL") != "" {
+		dbMode = "postgres"
 		if err := migratepkg.RunMigrations(); err != nil {
-			log.Fatalf("migration error: %v", err)
+			slog.Error("migration failed", "err", err)
+			os.Exit(1)
 		}
 	}
 
 	db, err := dbpkg.OpenDB()
 	if err != nil {
-		log.Fatalf("db open: %v", err)
+		slog.Error("failed to open database", "err", err)
+		os.Exit(1)
 	}
 
 	// Apply simple SQL migrations (SQLite development fallback).
 	migrationPath := findDirectory("migrations", []string{"migrations/sql", "./migrations/sql", "../migrations/sql", "/migrations/sql"})
 	if err := dbpkg.ApplySQLMigrations(db, migrationPath); err != nil {
-		log.Printf("migration error (dev): %v", err)
+		slog.Warn("dev migration error", "err", err)
 	}
 
 	cryptoSvc := cm.NewCryptoService(db)
@@ -109,6 +132,9 @@ func main() {
 	}
 	addr := ":" + port
 
+	authEnabled := os.Getenv("MASTER_PASSWORD") != ""
+	slog.Info("starting server", "addr", addr, "db", dbMode, "auth", authEnabled)
+
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      app.RequestLogger(mux),
@@ -122,17 +148,18 @@ func main() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		sig := <-sigCh
-		log.Printf("Received %s, shutting down...", sig)
+		slog.Info("shutting down", "signal", sig.String())
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("shutdown error: %v", err)
+			slog.Error("shutdown error", "err", err)
 		}
 		db.Close()
 	}()
 
-	log.Printf("Listening on %s", addr)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		log.Fatal(err)
+		slog.Error("server error", "err", err)
+		os.Exit(1)
 	}
+	slog.Info("server stopped")
 }

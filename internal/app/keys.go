@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -53,11 +53,12 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	q := a.DB.Rebind("INSERT INTO keys (name, armored, is_private, encrypted_password, password_bcrypt, created_at) VALUES (?, ?, ?, ?, ?, ?)")
 	if _, err = a.DB.ExecContext(r.Context(), q, name, armored, isPrivate, encrypted, bcryptHash, time.Now()); err != nil {
-		log.Printf("error inserting key: %v", err)
+		slog.Error("failed to insert key", "name", name, "err", err)
 		http.Error(w, "failed to store key", http.StatusInternalServerError)
 		return
 	}
 
+	slog.Info("key added", "name", name, "private", isPrivate)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -102,8 +103,10 @@ func (a *App) DeleteKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	q := a.DB.Rebind("DELETE FROM keys WHERE id = ?")
 	if _, err := a.DB.ExecContext(r.Context(), q, id); err != nil {
+		slog.Error("failed to delete key", "id", id, "err", err)
 		http.Error(w, "failed to delete key", http.StatusInternalServerError)
 		return
 	}
+	slog.Info("key deleted", "id", id)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

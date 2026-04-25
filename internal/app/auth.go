@@ -2,7 +2,7 @@ package app
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	cm "h-cloud.io/web-gpg/internal/crypto"
@@ -52,11 +52,12 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "server not configured for master password", http.StatusInternalServerError)
 			return
 		}
-		log.Printf("error verifying master password: %v", err)
+		slog.Error("failed to verify master password", "err", err)
 		http.Error(w, "internal error verifying password", http.StatusInternalServerError)
 		return
 	}
 	if !ok {
+		slog.Warn("login failed: invalid password", "ip", r.RemoteAddr)
 		a.Templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"Error": "invalid password"})
 		return
 	}
@@ -76,6 +77,7 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, cookie)
+	slog.Info("login successful", "ip", r.RemoteAddr)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -91,5 +93,6 @@ func isHTTPS(r *http.Request) bool {
 func (a *App) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	cookie := &http.Cookie{Name: "webgpg_auth", Value: "", Path: "/", MaxAge: -1}
 	http.SetCookie(w, cookie)
+	slog.Info("logout", "ip", r.RemoteAddr)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

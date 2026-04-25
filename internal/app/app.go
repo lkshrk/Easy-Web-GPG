@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"html/template"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/jmoiron/sqlx"
@@ -29,7 +29,7 @@ func (a *App) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	err := a.DB.SelectContext(r.Context(), &keys,
 		"SELECT id, name, armored, is_private, encrypted_password, created_at FROM keys ORDER BY created_at DESC")
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		log.Printf("error loading keys: %v", err)
+		slog.Error("failed to load keys", "err", err)
 		http.Error(w, "failed to load keys", http.StatusInternalServerError)
 		return
 	}
@@ -38,7 +38,7 @@ func (a *App) IndexHandler(w http.ResponseWriter, r *http.Request) {
 		"Keys": keys,
 	}
 	if err := a.Templates.ExecuteTemplate(w, "index.html", data); err != nil {
-		log.Printf("error rendering template: %v", err)
+		slog.Error("failed to render template", "template", "index.html", "err", err)
 		http.Error(w, "failed to render page", http.StatusInternalServerError)
 	}
 }

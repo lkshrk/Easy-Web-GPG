@@ -1,8 +1,9 @@
 package app
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -62,7 +63,7 @@ func RateLimit(rl *rateLimiter, next http.HandlerFunc) http.HandlerFunc {
 			ip = fwd
 		}
 		if !rl.allow(ip) {
-			log.Printf("rate limited: %s %s from %s", r.Method, r.URL.Path, ip)
+			slog.Warn("rate limit exceeded", "method", r.Method, "path", r.URL.Path, "ip", ip)
 			http.Error(w, "too many attempts, try again later", http.StatusTooManyRequests)
 			return
 		}
@@ -70,13 +71,40 @@ func RateLimit(rl *rateLimiter, next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// RequestLogger logs each incoming request.
+// RequestLogger logs mutations and error responses; skips successful GETs and static assets.
 func RequestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		lw := &loggingResponseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(lw, r)
-		log.Printf("%s %s %d %s", r.Method, r.URL.Path, lw.status, time.Since(start).Round(time.Millisecond))
+
+		// Never log static asset requests.
+		if strings.HasPrefix(r.URL.Path, "/static/") {
+			return
+		}
+
+		isMutation := r.Method == http.MethodPost || r.Method == http.MethodDelete ||
+			r.Method == http.MethodPut || r.Method == http.MethodPatch
+		isError := lw.status >= 400
+
+		if !isMutation && !isError {
+			return
+		}
+
+		attrs := []any{
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", lw.status,
+			"duration_ms", time.Since(start).Milliseconds(),
+		}
+		switch {
+		case lw.status >= 500:
+			slog.Error("request", attrs...)
+		case lw.status >= 400:
+			slog.Warn("request", attrs...)
+		default:
+			slog.Info("request", attrs...)
+		}
 	})
 }
 
