@@ -28,7 +28,7 @@
           <select id="key-select" class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-2.5 pr-10 text-sm text-[#c0caf5] appearance-none focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] transition-colors">
             <option value="">Select a key...</option>
             {{range .Keys}}
-            <option value="{{.ID}}" data-is-private="{{.IsPrivate}}">{{.Name}}{{if .IsPrivate}} (private){{end}}</option>
+            <option value="{{.ID}}" data-is-private="{{.IsPrivate}}">{{if .IsPrivate}}🔐{{else}}🔒{{end}} {{.Name}}</option>
             {{end}}
           </select>
           <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#565f89]">
@@ -46,12 +46,12 @@
         <div>
           <label for="input-text" class="block text-xs text-[#565f89] uppercase tracking-wider mb-2">Input</label>
           <textarea id="input-text" rows="12" placeholder="Paste plaintext to encrypt, or a PGP message to decrypt..."
-            class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-3 text-sm font-mono text-[#c0caf5] placeholder-[#565f89] focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] resize-y transition-colors"></textarea>
+            class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-3 text-sm font-mono text-[#c0caf5] placeholder-[#565f89] focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] resize-none transition-colors"></textarea>
         </div>
         <div>
           <label for="output-text" class="block text-xs text-[#565f89] uppercase tracking-wider mb-2">Output</label>
           <textarea id="output-text" rows="12" readonly placeholder="Result will appear here..."
-            class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-3 text-sm font-mono text-[#a9b1d6] placeholder-[#565f89] focus:outline-none resize-y"></textarea>
+            class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-3 text-sm font-mono text-[#a9b1d6] placeholder-[#565f89] focus:outline-none resize-none"></textarea>
         </div>
       </section>
 
@@ -81,7 +81,7 @@
             <div>
               <label for="key-armored" class="block text-xs text-[#565f89] mb-1">Armored PGP Key</label>
               <textarea id="key-armored" name="armored" rows="4" required
-                class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-2 text-sm font-mono text-[#c0caf5] placeholder-[#565f89] focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] resize-y transition-colors"></textarea>
+                class="w-full bg-[#16161e] border border-[#292e42] rounded-md px-3 py-2 text-sm font-mono text-[#c0caf5] placeholder-[#565f89] focus:outline-none focus:border-[#7aa2f7] focus:ring-1 focus:ring-[#7aa2f7] resize-none transition-colors"></textarea>
             </div>
             <div>
               <label for="key-password" class="block text-xs text-[#565f89] mb-1">Passphrase <span class="text-[#565f89]">(optional — saved for auto-decrypt)</span></label>
