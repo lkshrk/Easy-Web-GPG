@@ -3,6 +3,10 @@ name: Visual Regression
 # Run on every push/PR that doesn't touch visual files — confirms changes
 # are genuine no-ops (dependency bumps, backend refactors, CI changes, etc.).
 # Commits that *do* change templates/CSS skip this workflow entirely.
+#
+# Baseline: the parent commit (push) or base branch tip (PR).
+# This way the comparison is always "did THIS change break the UI?"
+# regardless of accumulated visual changes since the last release.
 on:
   push:
     branches: ['**']
@@ -23,6 +27,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Determine baseline SHA
+        id: baseline
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build baseline image
+        run: |
+          BASELINE_SHA="${{ steps.baseline.outputs.sha }}"
+          if [ "$BASELINE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BASELINE_SHA" ]; then
+            echo "No parent commit — using current commit as baseline (no regression possible)"
+            docker build -t easy-web-gpg:baseline .
+          else
+            git checkout "$BASELINE_SHA"
+            docker build -t easy-web-gpg:baseline .
+            git checkout -
+          fi
+
+      - name: Build current image
+        run: docker build -t easy-web-gpg:current .
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -39,17 +69,11 @@ jobs:
         working-directory: ./tests
         run: npx playwright install --with-deps chromium
 
-      - name: Pull baseline image (latest release)
-        run: docker pull ghcr.io/lkshrk/easy-web-gpg:latest
-
-      - name: Build current branch image
-        run: docker build -t easy-web-gpg:current .
-
       - name: Start containers
         run: |
           docker run -d --name easy-web-gpg-baseline -p 8081:8080 \
             -e MASTER_PASSWORD=test-password \
-            ghcr.io/lkshrk/easy-web-gpg:latest
+            easy-web-gpg:baseline
           docker run -d --name easy-web-gpg-current -p 8080:8080 \
             -e MASTER_PASSWORD=test-password \
             easy-web-gpg:current
