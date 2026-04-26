@@ -1,0 +1,83 @@
+name: Visual Regression
+
+# Run only on PRs that don't touch visual files — confirms changes are
+# genuine no-ops (dependency bumps, backend refactors, CI changes, etc.).
+# PRs that *do* change templates/CSS skip this workflow entirely.
+on:
+  pull_request:
+    branches: ['**']
+    paths-ignore:
+      - 'templates/**'
+      - 'static/css/**'
+      - 'static/img/**'
+
+jobs:
+  visual-regression:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./tests
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: ./tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Pull baseline image (latest release)
+        run: docker pull ghcr.io/lkshrk/easy-web-gpg:latest
+
+      - name: Build current branch image
+        run: docker build -t easy-web-gpg:current .
+
+      - name: Start containers
+        run: |
+          docker run -d --name easy-web-gpg-baseline -p 8081:8080 \
+            -e MASTER_PASSWORD=test-password \
+            ghcr.io/lkshrk/easy-web-gpg:latest
+          docker run -d --name easy-web-gpg-current -p 8080:8080 \
+            -e MASTER_PASSWORD=test-password \
+            easy-web-gpg:current
+
+      - name: Wait for containers
+        run: |
+          for port in 8080 8081; do
+            for i in {1..30}; do
+              if curl -sf http://localhost:$port/ > /dev/null 2>&1; then
+                echo "Port $port ready"
+                break
+              fi
+              echo "Waiting for port $port... ($i/30)"
+              sleep 1
+            done
+          done
+
+      - name: Run visual regression tests
+        working-directory: ./tests
+        env:
+          BASELINE_URL: http://localhost:8081
+          BASE_URL: http://localhost:8080
+        run: npm run test:visual
+
+      - name: Stop containers
+        if: always()
+        run: |
+          docker stop easy-web-gpg-baseline easy-web-gpg-current 2>/dev/null || true
+          docker rm easy-web-gpg-baseline easy-web-gpg-current 2>/dev/null || true
+
+      - name: Upload visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-diffs
+          path: tests/test-results/
+          retention-days: 7
