@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -15,6 +16,58 @@ import (
 	mm "h-cloud.io/web-gpg/internal/models"
 )
 
+// sanitizeArmored cleans common paste artifacts from an armored PGP block:
+//   - strips BOM, zero-width spaces, and non-breaking spaces from the outer edges
+//   - normalises line endings to LF
+//   - discards any content before -----BEGIN PGP and after -----END PGP
+//   - trims trailing whitespace from every line inside the block
+//
+// Base64 characters (A-Za-z0-9+/=) never include whitespace, so trimming
+// individual lines is safe and does not alter the encoded key material.
+func sanitizeArmored(s string) string {
+	// Strip invisible lead/trail chars that copy-paste sometimes introduces:
+	// BOM (U+FEFF), zero-width space (U+200B), non-breaking space (U+00A0),
+	// plus ordinary whitespace.
+	invisible := "\ufeff\u200b\u00a0"
+	s = strings.TrimFunc(s, func(r rune) bool {
+		return strings.ContainsRune(invisible, r) || r == ' ' || r == '\t' ||
+			r == '\n' || r == '\r'
+	})
+
+	// Normalise line endings.
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+
+	lines := strings.Split(s, "\n")
+
+	// Locate the outermost BEGIN / END PGP markers.
+	begin, end := -1, -1
+	for i, line := range lines {
+		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "-----BEGIN PGP") && begin == -1 {
+			begin = i
+		}
+		if strings.HasPrefix(t, "-----END PGP") {
+			end = i
+		}
+	}
+
+	if begin == -1 || end == -1 || end < begin {
+		// No recognisable PGP block — return trimmed input unchanged;
+		// the parser will produce a useful error message.
+		return s
+	}
+
+	block := lines[begin : end+1]
+	for i, line := range block {
+		block[i] = strings.TrimFunc(line, func(r rune) bool {
+			return r == ' ' || r == '\t' || r == '\u00a0'
+		})
+	}
+
+	return strings.Join(block, "\n") + "\n"
+}
+
 // AddKeyHandler stores a new PGP key.
 func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -22,12 +75,14 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := r.FormValue("name")
-	armored := r.FormValue("armored")
 	password := r.FormValue("password")
+
+	armored := sanitizeArmored(r.FormValue("armored"))
 
 	k, err := crypto.NewKeyFromArmored(armored)
 	if err != nil {
-		http.Error(w, "invalid PGP key", http.StatusBadRequest)
+		slog.Error("failed to parse armored PGP key", "name", name, "err", err)
+		http.Error(w, "invalid PGP key: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	isPrivate := k.IsPrivate()
@@ -41,11 +96,14 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "server not configured to store passphrases: set MASTER_PASSWORD env var", http.StatusInternalServerError)
 				return
 			}
-			http.Error(w, "failed to encrypt password", http.StatusInternalServerError)
+			slog.Error("failed to encrypt passphrase for storage", "name", name, "err", err)
+			http.Error(w, "failed to encrypt passphrase: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		encrypted = &enc
-		if h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost); err == nil {
+		if h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost); err != nil {
+			slog.Warn("failed to bcrypt passphrase; key stored without bcrypt hash", "name", name, "err", err)
+		} else {
 			hs := string(h)
 			bcryptHash = &hs
 		}
@@ -54,7 +112,7 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 	q := a.DB.Rebind("INSERT INTO keys (name, armored, is_private, encrypted_password, password_bcrypt, created_at) VALUES (?, ?, ?, ?, ?, ?)")
 	if _, err = a.DB.ExecContext(r.Context(), q, name, armored, isPrivate, encrypted, bcryptHash, time.Now()); err != nil {
 		slog.Error("failed to insert key", "name", name, "err", err)
-		http.Error(w, "failed to store key", http.StatusInternalServerError)
+		http.Error(w, "failed to store key: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -104,7 +162,7 @@ func (a *App) DeleteKeyHandler(w http.ResponseWriter, r *http.Request) {
 	q := a.DB.Rebind("DELETE FROM keys WHERE id = ?")
 	if _, err := a.DB.ExecContext(r.Context(), q, id); err != nil {
 		slog.Error("failed to delete key", "id", id, "err", err)
-		http.Error(w, "failed to delete key", http.StatusInternalServerError)
+		http.Error(w, "failed to delete key: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	slog.Info("key deleted", "id", id)

@@ -64,7 +64,8 @@ func (a *App) AuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	val, err := a.Crypto.CreateAuthCookieValue()
 	if err != nil {
-		http.Error(w, "failed to create auth token", http.StatusInternalServerError)
+		slog.Error("failed to create auth cookie", "err", err)
+		http.Error(w, "failed to create auth token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	cookie := &http.Cookie{

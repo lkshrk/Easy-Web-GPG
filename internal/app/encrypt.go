@@ -21,29 +21,34 @@ func (a *App) EncryptHandler(w http.ResponseWriter, r *http.Request) {
 	var k mm.Key
 	q := a.DB.Rebind("SELECT id, name, armored, is_private, encrypted_password FROM keys WHERE id = ?")
 	if err := a.DB.GetContext(r.Context(), &k, q, keyID); err != nil {
+		slog.Warn("encrypt: key not found", "key_id", keyID, "err", err)
 		http.Error(w, "key not found", http.StatusUnprocessableEntity)
 		return
 	}
 
 	kp, err := crypto.NewKeyFromArmored(k.Armored)
 	if err != nil {
-		http.Error(w, "invalid key", http.StatusUnprocessableEntity)
+		slog.Error("encrypt: failed to parse stored key", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "stored key is invalid: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	pub, err := kp.GetArmoredPublicKey()
 	if err != nil {
-		http.Error(w, "failed to get public key", http.StatusInternalServerError)
+		slog.Error("encrypt: failed to extract public key", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "failed to get public key: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	pubKeyObj, err := crypto.NewKeyFromArmored(pub)
 	if err != nil {
-		http.Error(w, "failed to parse public key", http.StatusInternalServerError)
+		slog.Error("encrypt: failed to re-parse extracted public key", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "failed to parse public key: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	recipientKR, err := crypto.NewKeyRing(pubKeyObj)
 	if err != nil {
-		http.Error(w, "failed to create keyring", http.StatusInternalServerError)
+		slog.Error("encrypt: failed to build keyring", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "failed to create keyring: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -51,13 +56,14 @@ func (a *App) EncryptHandler(w http.ResponseWriter, r *http.Request) {
 	pgpMsg, err := recipientKR.Encrypt(message, nil)
 	if err != nil {
 		slog.Error("PGP encryption failed", "key_id", keyID, "err", err)
-		http.Error(w, "encryption failed", http.StatusInternalServerError)
+		http.Error(w, "encryption failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	armored, err := pgpMsg.GetArmored()
 	if err != nil {
-		http.Error(w, "failed to armor message", http.StatusInternalServerError)
+		slog.Error("encrypt: failed to armor ciphertext", "key_id", keyID, "err", err)
+		http.Error(w, "failed to armor message: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -77,6 +83,7 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 	var k mm.Key
 	q := a.DB.Rebind("SELECT id, name, armored, is_private, encrypted_password FROM keys WHERE id = ?")
 	if err := a.DB.GetContext(r.Context(), &k, q, keyID); err != nil {
+		slog.Warn("decrypt: key not found", "key_id", keyID, "err", err)
 		http.Error(w, "key not found", http.StatusUnprocessableEntity)
 		return
 	}
@@ -88,13 +95,15 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 
 	priv, err := crypto.NewKeyFromArmored(k.Armored)
 	if err != nil {
-		http.Error(w, "invalid private key", http.StatusUnprocessableEntity)
+		slog.Error("decrypt: failed to parse stored private key", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "stored private key is invalid: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	locked, err := priv.IsLocked()
 	if err != nil {
-		http.Error(w, "failed to inspect private key", http.StatusInternalServerError)
+		slog.Error("decrypt: failed to inspect private key lock state", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "failed to inspect private key: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -103,17 +112,19 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 		if k.EncryptedPasshex != nil && *k.EncryptedPasshex != "" {
 			pwBytes, err := a.Crypto.Decrypt(*k.EncryptedPasshex)
 			if err != nil {
-				http.Error(w, "failed to decrypt stored password", http.StatusInternalServerError)
+				slog.Error("decrypt: failed to decrypt stored passphrase", "key_id", keyID, "name", k.Name, "err", err)
+				http.Error(w, "failed to decrypt stored passphrase: "+err.Error(), http.StatusInternalServerError)
 				return
 			}
 			unlocked, err := priv.Unlock(pwBytes)
 			if err != nil {
-				http.Error(w, "failed to unlock private key with stored password", http.StatusUnprocessableEntity)
+				slog.Warn("decrypt: stored passphrase did not unlock private key", "key_id", keyID, "name", k.Name, "err", err)
+				http.Error(w, "stored passphrase is wrong for this key: "+err.Error(), http.StatusUnprocessableEntity)
 				return
 			}
 			keyToUse = unlocked
 		} else {
-			http.Error(w, "private key is password protected; no stored password", http.StatusUnprocessableEntity)
+			http.Error(w, "private key is passphrase-protected but no passphrase was stored", http.StatusUnprocessableEntity)
 			return
 		}
 	} else {
@@ -122,20 +133,22 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 
 	kr, err := crypto.NewKeyRing(keyToUse)
 	if err != nil {
-		http.Error(w, "failed to create keyring", http.StatusInternalServerError)
+		slog.Error("decrypt: failed to build keyring", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "failed to create keyring: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	encMessage, err := crypto.NewPGPMessageFromArmored(input)
 	if err != nil {
-		http.Error(w, "invalid armored message", http.StatusUnprocessableEntity)
+		slog.Warn("decrypt: invalid armored message from user", "key_id", keyID, "err", err)
+		http.Error(w, "invalid armored message: "+err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
 	decrypted, err := kr.Decrypt(encMessage, nil, 0)
 	if err != nil {
 		slog.Error("PGP decryption failed", "key_id", keyID, "err", err)
-		http.Error(w, "decryption failed", http.StatusInternalServerError)
+		http.Error(w, "decryption failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
