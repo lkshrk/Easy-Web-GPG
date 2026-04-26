@@ -5,15 +5,15 @@
 # ------------------------------------------------------------------------------
 # Stage 1: Build CSS assets
 # ------------------------------------------------------------------------------
-FROM debian:bookworm-slim AS css_builder
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS css_builder
 
 WORKDIR /app
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 COPY static/css/ ./static/css/
 COPY templates/ ./templates/
 
-ARG TARGETARCH
-RUN TAILWIND_ARCH=$(case ${TARGETARCH:-amd64} in \
+ARG BUILDARCH
+RUN TAILWIND_ARCH=$(case ${BUILDARCH:-amd64} in \
       amd64) echo "x64" ;; \
       arm64) echo "arm64" ;; \
       *) echo "x64" ;; \
@@ -26,7 +26,7 @@ RUN TAILWIND_ARCH=$(case ${TARGETARCH:-amd64} in \
 # ------------------------------------------------------------------------------
 # Stage 2: Go dependencies (shared cache layer)
 # ------------------------------------------------------------------------------
-FROM golang:1.26-alpine AS go_deps
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS go_deps
 
 WORKDIR /src
 RUN apk add --no-cache ca-certificates git && update-ca-certificates
@@ -40,8 +40,9 @@ FROM go_deps AS go_builder
 
 COPY . .
 COPY --from=css_builder /app/static/dist/ ./static/dist/
+ARG TARGETOS TARGETARCH
 ENV CGO_ENABLED=0
-RUN go build -ldflags="-s -w" -trimpath -o /easy-web-gpg ./cmd/easywebgpg
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -trimpath -o /easy-web-gpg ./cmd/easywebgpg
 
 # ------------------------------------------------------------------------------
 # Stage 4: Go tests  (docker build --target go-test .)
