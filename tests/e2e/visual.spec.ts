@@ -50,13 +50,15 @@ test.describe('Visual Regression Tests', () => {
 });
 
 test.describe('Functional Tests', () => {
+  // The login form is rendered at / when unauthenticated.
+  // /auth is POST-only (form submission target), not a GET-able page.
   test('login page loads', async ({ page }) => {
-    await page.goto('/auth');
+    await page.goto('/');
     await expect(page.locator('button[type="submit"]')).toContainText('Unlock');
   });
 
   test('shows login error on wrong password', async ({ page }) => {
-    await page.goto('/auth');
+    await page.goto('/');
     await page.fill('input[name="password"]', 'wrong-password');
     await page.click('button[type="submit"]');
 
