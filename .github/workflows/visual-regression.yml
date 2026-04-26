@@ -1,9 +1,15 @@
 name: Visual Regression
 
-# Run only on PRs that don't touch visual files — confirms changes are
-# genuine no-ops (dependency bumps, backend refactors, CI changes, etc.).
-# PRs that *do* change templates/CSS skip this workflow entirely.
+# Run on every push/PR that doesn't touch visual files — confirms changes
+# are genuine no-ops (dependency bumps, backend refactors, CI changes, etc.).
+# Commits that *do* change templates/CSS skip this workflow entirely.
 on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - 'templates/**'
+      - 'static/css/**'
+      - 'static/img/**'
   pull_request:
     branches: ['**']
     paths-ignore:
