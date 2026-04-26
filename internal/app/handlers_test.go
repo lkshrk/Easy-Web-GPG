@@ -658,6 +658,179 @@ func TestRequireAuth_NonRootRedirect(t *testing.T) {
 	}
 }
 
+// TestRequestLogger_StaticPath verifies that static asset requests are not logged.
+func TestRequestLogger_StaticPath(t *testing.T) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := apppkg.RequestLogger(inner)
+	req := httptest.NewRequest(http.MethodGet, "/static/css/style.css", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// TestRequestLogger_MutationLogging verifies POST requests are logged.
+func TestRequestLogger_MutationLogging(t *testing.T) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := apppkg.RequestLogger(inner)
+	req := httptest.NewRequest(http.MethodPost, "/auth", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// TestRequestLogger_ErrorLogging verifies 4xx and 5xx GET responses are logged.
+func TestRequestLogger_ErrorLogging(t *testing.T) {
+	for _, code := range []int{400, 404, 500} {
+		code := code
+		t.Run(fmt.Sprint(code), func(t *testing.T) {
+			inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(code)
+			})
+			handler := apppkg.RequestLogger(inner)
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if w.Code != code {
+				t.Fatalf("expected %d, got %d", code, w.Code)
+			}
+		})
+	}
+}
+
+// TestIsHTTPS_ForwardedProto verifies the auth cookie is Secure when
+// X-Forwarded-Proto: https is set.
+func TestIsHTTPS_ForwardedProto(t *testing.T) {
+	a, _ := setupTestApp(t)
+	t.Setenv("MASTER_PASSWORD", "s3cret")
+	a.MasterPassword = "s3cret"
+
+	form := url.Values{}
+	form.Set("password", "s3cret")
+	req := httptest.NewRequest(http.MethodPost, "/auth", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	w := httptest.NewRecorder()
+	a.AuthHandler(w, req)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d", w.Code)
+	}
+	for _, c := range w.Result().Cookies() {
+		if c.Name == "webgpg_auth" {
+			if !c.Secure {
+				t.Fatal("expected cookie Secure=true with X-Forwarded-Proto: https")
+			}
+			return
+		}
+	}
+	t.Fatal("auth cookie not found")
+}
+
+// TestDecryptHandler_CorruptStoredKey verifies that decrypting with a key that
+// has corrupt armored data in the DB returns 500.
+func TestDecryptHandler_CorruptStoredKey(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
+		"corrupt-priv", "not-valid-pgp-data", true, time.Now())
+	keyID, _ := res.LastInsertId()
+
+	form := url.Values{}
+	form.Set("key", fmt.Sprint(keyID))
+	form.Set("input", "-----BEGIN PGP MESSAGE-----\nfake\n-----END PGP MESSAGE-----")
+	req := httptest.NewRequest(http.MethodPost, "/decrypt", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.DecryptHandler(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestDecryptHandler_WrongKey verifies that decrypting a message encrypted to
+// a different key returns 500.
+func TestDecryptHandler_WrongKey(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	// Store key1 as private key (no passphrase)
+	key1, _ := gcrypto.GenerateKey("Key1", "k1@t.com", "", 2048)
+	key2, _ := gcrypto.GenerateKey("Key2", "k2@t.com", "", 2048)
+	priv1Armored, _ := key1.Armor()
+	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
+		"key1", priv1Armored, true, time.Now())
+	key1ID, _ := res.LastInsertId()
+
+	// Encrypt a message with key2's public key
+	pub2Armored, _ := key2.GetArmoredPublicKey()
+	pub2, _ := gcrypto.NewKeyFromArmored(pub2Armored)
+	kr, _ := gcrypto.NewKeyRing(pub2)
+	pgpMsg, _ := kr.Encrypt(gcrypto.NewPlainMessageFromString("secret"), nil)
+	encrypted, _ := pgpMsg.GetArmored()
+
+	// Try to decrypt with key1 (wrong key — should fail)
+	form := url.Values{}
+	form.Set("key", fmt.Sprint(key1ID))
+	form.Set("input", encrypted)
+	req := httptest.NewRequest(http.MethodPost, "/decrypt", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.DecryptHandler(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 for wrong key, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestEncryptHandler_CorruptStoredKey verifies that encrypting with a key that
+// has corrupt armored data in the DB returns 500.
+func TestEncryptHandler_CorruptStoredKey(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
+		"corrupt", "not-valid-pgp-data", false, time.Now())
+	keyID, _ := res.LastInsertId()
+
+	form := url.Values{}
+	form.Set("key", fmt.Sprint(keyID))
+	form.Set("input", "hello")
+	req := httptest.NewRequest(http.MethodPost, "/encrypt", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.EncryptHandler(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestAddKeyHandler_MasterPasswordNotSetForPassphrase verifies that adding a
+// key with a passphrase when MASTER_PASSWORD is not configured returns 500.
+func TestAddKeyHandler_MasterPasswordNotSetForPassphrase(t *testing.T) {
+	a, _ := setupTestApp(t)
+	// Clear master password so Crypto.Encrypt fails with ErrMasterPasswordNotSet
+	t.Setenv("MASTER_PASSWORD", "")
+
+	priv, _ := gcrypto.GenerateKey("Test", "t@t.com", "keypass", 2048)
+	privArmored, _ := priv.Armor()
+
+	form := url.Values{}
+	form.Set("name", "no-master-key")
+	form.Set("armored", privArmored)
+	form.Set("password", "keypass")
+	req := httptest.NewRequest(http.MethodPost, "/keys", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.AddKeyHandler(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 // TestStory_DecryptRejectsPublicKey ensures decryption with a public-only key
 // returns a clear error.
 func TestStory_DecryptRejectsPublicKey(t *testing.T) {

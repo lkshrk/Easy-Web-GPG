@@ -1,8 +1,6 @@
 package app
 
 import (
-	"database/sql"
-	"errors"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -28,7 +26,7 @@ func (a *App) IndexHandler(w http.ResponseWriter, r *http.Request) {
 	var keys []mm.Key
 	err := a.DB.SelectContext(r.Context(), &keys,
 		"SELECT id, name, armored, is_private, encrypted_password, created_at FROM keys ORDER BY created_at DESC")
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		slog.Error("failed to load keys", "err", err)
 		http.Error(w, "failed to load keys", http.StatusInternalServerError)
 		return

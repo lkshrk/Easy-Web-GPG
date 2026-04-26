@@ -50,9 +50,8 @@ func (rl *rateLimiter) allow(ip string) bool {
 	return true
 }
 
-// AuthRateLimiter is a rate limiter for the auth endpoint.
-// Allows max attempts per window per IP.
-// AuthRateLimiter is a rate limiter for the auth endpoint.
+// AuthRateLimiter is the default rate limiter for the auth endpoint.
+// Allows up to 10 attempts per IP per 15-minute window.
 var AuthRateLimiter = NewRateLimiter(15*time.Minute, 10)
 
 // RateLimit wraps a handler with IP-based rate limiting.

@@ -12,7 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -93,7 +93,7 @@ func (cs *CryptoService) readOrCreateSalt() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert master_salt: %w", err)
 		}
-		log.Printf("INFO: generated master salt and stored in DB (secrets.name=master_salt); keep DB backups")
+		slog.Info("generated master salt and stored in DB", "secrets_key", "master_salt")
 		return s, nil
 	}
 
