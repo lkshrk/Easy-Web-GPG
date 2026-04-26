@@ -26,7 +26,7 @@ RUN TAILWIND_ARCH=$(case ${TARGETARCH:-amd64} in \
 # ------------------------------------------------------------------------------
 # Stage 2: Go dependencies (shared cache layer)
 # ------------------------------------------------------------------------------
-FROM golang:1.25-alpine AS go_deps
+FROM golang:1.26-alpine AS go_deps
 
 WORKDIR /src
 RUN apk add --no-cache ca-certificates git && update-ca-certificates
@@ -55,7 +55,7 @@ CMD ["go", "test", "-race", "-v", "./..."]
 # ------------------------------------------------------------------------------
 # Stage 5: Development — Air live reload  (docker build --target dev .)
 # ------------------------------------------------------------------------------
-FROM golang:1.25-alpine AS dev
+FROM golang:1.26-alpine AS dev
 
 WORKDIR /app
 RUN apk add --no-cache ca-certificates git && update-ca-certificates && \
@@ -79,13 +79,23 @@ RUN npx playwright install --with-deps chromium
 CMD ["npx", "playwright", "test", "--reporter=list"]
 
 # ------------------------------------------------------------------------------
-# Stage 7: Binary export  (docker build --target binary-export --output bin/ .)
+# Stage 7: Dev container — dev + IDE tools  (target: devcontainer)
+# ------------------------------------------------------------------------------
+FROM dev AS devcontainer
+
+RUN go install golang.org/x/tools/gopls@latest \
+    && go install github.com/go-delve/delve/cmd/dlv@latest \
+    && go install honnef.co/go/tools/cmd/staticcheck@latest \
+    && apk add --no-cache sqlite
+
+# ------------------------------------------------------------------------------
+# Stage 9: Binary export  (docker build --target binary-export --output bin/ .)
 # ------------------------------------------------------------------------------
 FROM scratch AS binary-export
 COPY --from=go_builder /easy-web-gpg /easy-web-gpg
 
 # ------------------------------------------------------------------------------
-# Stage 8: Runtime image  (default target)
+# Stage 10: Runtime image  (default target)
 # ------------------------------------------------------------------------------
 FROM gcr.io/distroless/static:nonroot AS runtime
 

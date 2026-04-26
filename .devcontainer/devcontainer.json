@@ -1,7 +1,9 @@
 {
   "name": "Easy Web GPG Development",
   "build": {
-    "dockerfile": "Dockerfile"
+    "context": "..",
+    "dockerfile": "../Dockerfile",
+    "target": "devcontainer"
   },
   "customizations": {
     "vscode": {
@@ -22,6 +24,5 @@
     }
   },
   "forwardPorts": [8080],
-  "postCreateCommand": "go mod download",
-  "remoteUser": "vscode"
+  "postCreateCommand": "go mod download"
 }
