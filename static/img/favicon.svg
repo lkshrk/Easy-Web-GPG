@@ -1,0 +1,21 @@
+<svg viewBox="43 14 94 100" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>easy-web-gpg</title>
+
+  <!-- Shield outer (depth) -->
+  <path d="M 90,18 L 133,33 L 133,82 Q 90,111 90,111 Q 47,82 47,82 L 47,33 Z" fill="#1e2b5e"/>
+
+  <!-- Shield inner (accent blue) -->
+  <path d="M 90,25 L 126,38 L 126,79 Q 90,104 90,104 Q 54,79 54,79 L 54,38 Z" fill="#7aa2f7"/>
+
+  <!-- Lock shackle (scaled 80%, centered at 90,64) -->
+  <path d="M 81,60 L 81,50 A 9,9 0 0,1 99,50 L 99,60" fill="none" stroke="#c0caf5" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- Lock body (scaled 80%) -->
+  <rect x="76" y="58" width="28" height="23" rx="3" fill="#c0caf5"/>
+
+  <!-- Keyhole circle -->
+  <circle cx="90" cy="67" r="4" fill="#7aa2f7"/>
+
+  <!-- Keyhole slot -->
+  <rect x="88" y="67" width="4" height="7" rx="1.5" fill="#7aa2f7"/>
+</svg>

@@ -1,0 +1,12 @@
+{
+  "name": "easy-web-gpg",
+  "short_name": "easy-web-gpg",
+  "icons": [
+    { "src": "/static/img/favicon-16x16.png", "sizes": "16x16", "type": "image/png" },
+    { "src": "/static/img/favicon-32x32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/static/img/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ],
+  "theme_color": "#1a1b26",
+  "background_color": "#1a1b26",
+  "display": "standalone"
+}
