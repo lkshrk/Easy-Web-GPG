@@ -831,6 +831,68 @@ func TestAddKeyHandler_MasterPasswordNotSetForPassphrase(t *testing.T) {
 	}
 }
 
+// TestAddKeyHandler_LongPassphraseNoBcryptOverflow is a regression test for
+// the bcrypt 72-byte limit. Before the fix, passphrases longer than 72 bytes
+// caused bcrypt.GenerateFromPassword to error, and the key was stored without
+// a bcrypt hash. With the SHA-256 pre-hash fix the hash must always be stored.
+func TestAddKeyHandler_LongPassphraseNoBcryptOverflow(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	longPass := strings.Repeat("x", 80) // 80 bytes — exceeds bcrypt's 72-byte limit
+	priv, _ := gcrypto.GenerateKey("Long Pass", "lp@test.com", longPass, 2048)
+	privArmored, _ := priv.Armor()
+
+	form := url.Values{}
+	form.Set("name", "long-pass-key")
+	form.Set("armored", privArmored)
+	form.Set("password", longPass)
+	req := httptest.NewRequest(http.MethodPost, "/keys", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.AddKeyHandler(w, req)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// bcrypt hash must be non-nil — SHA-256 pre-hash prevents the overflow error.
+	var bcryptHash *string
+	if err := db.Get(&bcryptHash, "SELECT password_bcrypt FROM keys WHERE name = 'long-pass-key'"); err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+	if bcryptHash == nil || *bcryptHash == "" {
+		t.Fatal("expected bcrypt hash to be stored; got nil (bcrypt overflow not fixed)")
+	}
+}
+
+// TestAddKeyHandler_IsPrivateRoundtrip is a regression test for the pgx
+// bool→int4 encode error. The handler must write is_private=true for a private
+// key and it must scan back as true.
+func TestAddKeyHandler_IsPrivateRoundtrip(t *testing.T) {
+	a, db := setupTestApp(t)
+
+	priv, _ := gcrypto.GenerateKey("Priv RT", "rt@test.com", "", 2048)
+	privArmored, _ := priv.Armor()
+
+	form := url.Values{}
+	form.Set("name", "priv-rt")
+	form.Set("armored", privArmored)
+	req := httptest.NewRequest(http.MethodPost, "/keys", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	a.AddKeyHandler(w, req)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var isPrivate bool
+	if err := db.Get(&isPrivate, "SELECT is_private FROM keys WHERE name = 'priv-rt'"); err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+	if !isPrivate {
+		t.Fatal("expected is_private=true for private key stored via handler")
+	}
+}
+
 // TestStory_DecryptRejectsPublicKey ensures decryption with a public-only key
 // returns a clear error.
 func TestStory_DecryptRejectsPublicKey(t *testing.T) {
