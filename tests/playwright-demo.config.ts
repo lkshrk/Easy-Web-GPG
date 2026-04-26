@@ -11,6 +11,7 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     viewport: { width: 1400, height: 900 },
+    deviceScaleFactor: 2,
     screenshot: 'off',
     video: 'off',
   },
