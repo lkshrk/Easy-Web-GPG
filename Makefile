@@ -1,4 +1,4 @@
-.PHONY: help build run test test-docker clean css css-watch docker-build docker-run test-visual test-visual-setup test-visual-cleanup dev dev-build dev-down dev-logs
+.PHONY: help build run test test-docker clean css css-watch docker-build docker-run test-visual test-visual-setup test-visual-cleanup dev dev-build dev-down dev-logs demo-gif
 
 help:
 	@echo "Easy Web GPG"
@@ -14,6 +14,7 @@ help:
 	@echo "  test-docker       - Run all tests in Docker (no dependencies)"
 	@echo "  css               - Build Tailwind CSS (minified)"
 	@echo "  css-watch         - Watch and rebuild Tailwind CSS"
+	@echo "  demo-gif          - Regenerate .github/assets/demo.gif (requires Go, Node, ImageMagick)"
 	@echo "  test-visual       - Run visual regression tests (full comparison)"
 	@echo "  test-visual-setup - Setup containers for visual testing"
 	@echo "  test-visual-cleanup - Stop and remove visual test containers"
@@ -53,6 +54,9 @@ css: $(TAILWIND_BIN)
 css-watch: $(TAILWIND_BIN)
 	@mkdir -p static/dist
 	$(TAILWIND_BIN) -i static/css/input.css -o static/dist/styles.css --watch
+
+demo-gif: css
+	@bash scripts/demo.sh
 
 build:
 	docker build --target binary-export --output bin/ .

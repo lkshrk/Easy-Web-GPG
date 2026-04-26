@@ -1,10 +1,10 @@
 # Easy Web GPG
 
-Lightweight web UI for encrypting/decrypting PGP messages.
-
 <div align="center">
-  <img src="https://raw.githubusercontent.com/lkshrk/Easy-Web-GPG/ci/screenshot/.github/screenshot.png" alt="Easy Web GPG screenshot" style="max-width:900px;width:100%;height:auto;display:block;margin:0 auto;" />
+  <img src=".github/assets/demo.gif" alt="Easy Web GPG demo" style="max-width:900px;width:100%;height:auto;display:block;margin:0 auto;" />
 </div>
+
+Lightweight web UI for encrypting/decrypting PGP messages.
 
 ## Features
 

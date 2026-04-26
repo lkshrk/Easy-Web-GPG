@@ -106,3 +106,6 @@ CLAUDE.md
 
 # OpenWolf
 .wolf/
+
+# Demo GIF intermediate frames
+scripts/demo-frames/
