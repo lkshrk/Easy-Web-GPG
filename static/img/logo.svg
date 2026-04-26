@@ -1,0 +1,27 @@
+<svg viewBox="39 10 400 109" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>easy-web-gpg</title>
+
+  <!-- Shield outer (depth) -->
+  <path d="M 90,18 L 133,33 L 133,82 Q 90,111 90,111 Q 47,82 47,82 L 47,33 Z" fill="#1e2b5e"/>
+
+  <!-- Shield inner (accent blue) -->
+  <path d="M 90,25 L 126,38 L 126,79 Q 90,104 90,104 Q 54,79 54,79 L 54,38 Z" fill="#7aa2f7"/>
+
+  <!-- Lock shackle -->
+  <path d="M 79,59 L 79,46 A 11,11 0 0,1 101,46 L 101,59" fill="none" stroke="#c0caf5" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Lock body -->
+  <rect x="73" y="57" width="34" height="28" rx="4" fill="#c0caf5"/>
+
+  <!-- Keyhole circle -->
+  <circle cx="90" cy="68" r="5" fill="#7aa2f7"/>
+
+  <!-- Keyhole slot -->
+  <rect x="87.5" y="68" width="5" height="9" rx="1.5" fill="#7aa2f7"/>
+
+  <!-- Wordmark — monospace to match app font (JetBrains Mono / Fira Code) -->
+  <text x="157" y="80" font-size="38"
+        font-family='"JetBrains Mono","Fira Code",ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace'>
+    <tspan fill="#565f89" font-weight="400">easy-web-</tspan><tspan fill="#7aa2f7" font-weight="500">gpg</tspan>
+  </text>
+</svg>
