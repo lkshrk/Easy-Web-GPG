@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -76,8 +77,11 @@ func loadTemplates() *template.Template {
 func main() {
 	initLogger()
 
+	dbURL := os.Getenv("DATABASE_URL")
+	isPostgres := dbURL != "" && !strings.HasPrefix(strings.ToLower(dbURL), "sqlite://")
+
 	dbMode := "sqlite"
-	if os.Getenv("DATABASE_URL") != "" {
+	if isPostgres {
 		dbMode = "postgres"
 		if err := migratepkg.RunMigrations(); err != nil {
 			slog.Error("migration failed", "err", err)
@@ -91,10 +95,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Apply simple SQL migrations (SQLite development fallback).
-	migrationPath := findDirectory("migrations", []string{"migrations/sql", "./migrations/sql", "../migrations/sql", "/migrations/sql"})
-	if err := dbpkg.ApplySQLMigrations(db, migrationPath); err != nil {
-		slog.Warn("dev migration error", "err", err)
+	// Apply simple SQL migrations for SQLite only.
+	// PostgreSQL uses golang-migrate (RunMigrations above) with proper version tracking.
+	if !isPostgres {
+		migrationPath := findDirectory("migrations", []string{"migrations/sql", "./migrations/sql", "../migrations/sql", "/migrations/sql"})
+		if err := dbpkg.ApplySQLMigrations(db, migrationPath); err != nil {
+			slog.Warn("dev migration error", "err", err)
+		}
 	}
 
 	cryptoSvc := cm.NewCryptoService(db)

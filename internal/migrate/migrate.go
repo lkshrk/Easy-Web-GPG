@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,19 +61,28 @@ func RunMigrations() error {
 		return fmt.Errorf("migrate new: %w", err)
 	}
 
-	version, dirty, err := m.Version()
+	before, dirty, err := m.Version()
 	if err != nil && err != migrate.ErrNilVersion {
 		return fmt.Errorf("migrate version: %w", err)
 	}
-
 	if dirty {
-		if err := m.Force(int(version)); err != nil {
-			return fmt.Errorf("migrate force clear dirty at version %d: %w", version, err)
-		}
+		// A dirty flag means the previous migration was interrupted mid-execution.
+		// Silently forcing it clean (m.Force) would mark the migration as applied
+		// without having run it — do not do that. Surface the error so the operator
+		// can inspect and resolve it manually.
+		return fmt.Errorf("database is in a dirty state at version %d; resolve manually with 'migrate force'", before)
 	}
+	slog.Info("running migrations", "current_version", before)
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("migrate up: %w", err)
+	}
+
+	after, _, _ := m.Version()
+	if after != before {
+		slog.Info("migrations applied", "from_version", before, "to_version", after)
+	} else {
+		slog.Info("migrations up to date", "version", after)
 	}
 	return nil
 }

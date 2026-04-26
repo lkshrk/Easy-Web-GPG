@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -126,37 +127,14 @@ func TestMigrationDirtyStateHandling(t *testing.T) {
 		t.Fatalf("failed to set dirty state: %v", err)
 	}
 
-	// Run migrations again - should handle dirty state and recover
+	// RunMigrations must return an error when the database is dirty.
+	// Silently forcing it clean (old Force() behaviour) would mark the migration
+	// as applied without having run it — this hides real failures.
 	err = RunMigrations()
-	if err != nil {
-		t.Fatalf("RunMigrations failed to handle dirty state: %v", err)
+	if err == nil {
+		t.Fatal("expected RunMigrations to return an error for dirty database, got nil")
 	}
-
-	// Verify clean state
-	var dirty bool
-	err = db.QueryRow("SELECT dirty FROM schema_migrations").Scan(&dirty)
-	if err != nil {
-		t.Fatalf("failed to query schema_migrations: %v", err)
-	}
-
-	if dirty {
-		t.Error("schema_migrations is still marked as dirty after recovery")
-	}
-
-	// Run migrations a third time - should not fail with "no migration found for version X"
-	// This tests that we don't call m.Up() when already at latest version
-	err = RunMigrations()
-	if err != nil {
-		t.Fatalf("RunMigrations failed when already at latest version: %v", err)
-	}
-
-	var dirty2 bool
-	err = db.QueryRow("SELECT dirty FROM schema_migrations").Scan(&dirty2)
-	if err != nil {
-		t.Fatalf("failed to query schema_migrations: %v", err)
-	}
-
-	if dirty2 {
-		t.Error("schema_migrations is marked as dirty after running at latest version")
+	if !strings.Contains(err.Error(), "dirty") {
+		t.Fatalf("expected dirty-state error, got: %v", err)
 	}
 }
