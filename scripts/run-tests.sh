@@ -18,7 +18,7 @@ ALL_TESTS_PASSED=true
 run_go_tests() {
   echo -e "\n${YELLOW}Running Go tests...${NC}"
 
-  docker build --target go-test -t easy-web-gpg:test-go -f Dockerfile.test .
+  docker build --target go-test -t easy-web-gpg:test-go .
 
   if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Go tests passed${NC}"
@@ -65,7 +65,7 @@ run_e2e_tests() {
   done
 
   # Run Playwright tests
-  docker build --target playwright-test -t easy-web-gpg:test-e2e -f Dockerfile.test .
+  docker build --target playwright-test -t easy-web-gpg:test-e2e .
   E2E_RESULT=$?
 
   # Cleanup

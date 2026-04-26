@@ -74,7 +74,7 @@ test-docker:
 	docker build -t easy-web-gpg:latest .
 	@echo ""
 	@echo "Running Go tests..."
-	docker build --target go-test -t easy-web-gpg:test-go -f Dockerfile.test .
+	docker build --target go-test -t easy-web-gpg:test-go .
 	@echo ""
 	@echo "Running E2E tests..."
 	@docker run -d --name easy-web-gpg-test-app \
@@ -88,7 +88,7 @@ test-docker:
 		fi; \
 		sleep 1; \
 	done; \
-	docker build --target playwright-test -t easy-web-gpg:test-e2e -f Dockerfile.test .; \
+	docker build --target playwright-test -t easy-web-gpg:test-e2e .; \
 	docker stop easy-web-gpg-test-app > /dev/null 2>&1; \
 	docker rm easy-web-gpg-test-app > /dev/null 2>&1; \
 	echo ""
