@@ -23,7 +23,7 @@ Open http://localhost:8080
 | Variable | Required | Description |
 |---|:---:|---|
 | `MASTER_PASSWORD` | ✓ | Master password for deriving encryption keys (Argon2id) |
-| `DATABASE_URL` | | Database connection string (defaults to SQLite at `/data/db.sqlite`) |
+| `DATABASE_URL` | | Database connection string (default SQLite, Postgres supported) |
 | `PORT` | | HTTP port (default: `8080`) |
 | `FORCE_SECURE_COOKIES` | | Set to `1` for HTTPS environments |
 
