@@ -15,8 +15,8 @@ help:
 	@echo "  css               - Build Tailwind CSS (minified)"
 	@echo "  css-watch         - Watch and rebuild Tailwind CSS"
 	@echo "  demo-gif          - Regenerate .github/assets/demo.gif (requires Go, Node, ImageMagick)"
-	@echo "  test-visual       - Run visual regression tests (full comparison)"
-	@echo "  test-visual-setup - Setup containers for visual testing"
+	@echo "  test-visual       - Run visual regression tests (latest release vs current branch)"
+	@echo "  test-visual-setup - Pull baseline + build current branch containers"
 	@echo "  test-visual-cleanup - Stop and remove visual test containers"
 	@echo "  clean             - Clean build artifacts"
 	@echo "  docker-build      - Build Docker image"
@@ -109,27 +109,25 @@ docker-run: docker-build
 		-v "$(CURDIR)/data:/data" \
 		easy-web-gpg:latest
 
+BASELINE_IMAGE := ghcr.io/lkshrk/easy-web-gpg:latest
+
 test-visual-setup:
 	@echo "Setting up visual regression test environment..."
-	@echo "Building main branch Docker image..."
-	@if [ ! -d "/tmp/easy-web-gpg-main" ]; then \
-		git clone . /tmp/easy-web-gpg-main 2>/dev/null || true; \
-	fi
-	@cd /tmp/easy-web-gpg-main && git fetch origin && git checkout main && git pull
-	@docker build -t easy-web-gpg:main /tmp/easy-web-gpg-main
+	@echo "Pulling baseline image (latest release)..."
+	@docker pull $(BASELINE_IMAGE)
 	@echo "Building current branch Docker image..."
 	@docker build -t easy-web-gpg:current .
-	@echo "Starting main branch application on port 8081..."
+	@echo "Starting baseline application on port 8081..."
 	@docker run -d --name easy-web-gpg-main -p 8081:8080 \
 		-e MASTER_PASSWORD="test-password" \
-		easy-web-gpg:main
-	@echo "Waiting for main branch application to be ready..."
+		$(BASELINE_IMAGE)
+	@echo "Waiting for baseline application to be ready..."
 	@for i in $$(seq 1 30); do \
 		if curl -sf http://localhost:8081/ > /dev/null 2>&1; then \
-			echo "Main branch application is ready"; \
+			echo "Baseline application is ready"; \
 			break; \
 		fi; \
-		echo "Waiting for main branch application... ($$i/30)"; \
+		echo "Waiting for baseline application... ($$i/30)"; \
 		sleep 1; \
 	done
 	@echo "Starting current branch application on port 8080..."
@@ -147,14 +145,13 @@ test-visual-setup:
 	done
 	@echo ""
 	@echo "Visual test environment ready!"
-	@echo "  Main branch:    http://localhost:8081"
-	@echo "  Current branch: http://localhost:8080"
+	@echo "  Baseline (latest release): http://localhost:8081"
+	@echo "  Current branch:            http://localhost:8080"
 
 test-visual-cleanup:
 	@echo "Cleaning up visual regression test environment..."
 	@docker stop easy-web-gpg-main easy-web-gpg-current 2>/dev/null || true
 	@docker rm easy-web-gpg-main easy-web-gpg-current 2>/dev/null || true
-	@rm -rf /tmp/easy-web-gpg-main
 	@echo "Cleanup complete"
 
 test-visual: test-visual-setup
