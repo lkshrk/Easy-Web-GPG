@@ -60,7 +60,7 @@ func (a *App) EncryptHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	armored, err := pgpMsg.GetArmored()
+	armored, err := pgpMsg.GetArmoredWithCustomHeaders("", "")
 	if err != nil {
 		slog.Error("encrypt: failed to armor ciphertext", "key_id", keyID, "err", err)
 		http.Error(w, "failed to armor message: "+err.Error(), http.StatusInternalServerError)
