@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	gcrypto "github.com/ProtonMail/gopenpgp/v2/crypto"
+	gcrypto "github.com/ProtonMail/gopenpgp/v3/crypto"
 	_ "modernc.org/sqlite"
 	"github.com/jmoiron/sqlx"
 
@@ -56,6 +56,25 @@ func setupTestApp(t *testing.T) (*apppkg.App, *sqlx.DB) {
 	return a, db
 }
 
+// generateTestKey creates a PGP key for test fixtures. If passphrase is non-empty,
+// the returned key is locked with that passphrase.
+func generateTestKey(t *testing.T, name, email, passphrase string) *gcrypto.Key {
+	t.Helper()
+	handle := gcrypto.PGP().KeyGeneration().AddUserId(name, email).New()
+	key, err := handle.GenerateKey()
+	if err != nil {
+		t.Fatalf("generateTestKey(%s): %v", name, err)
+	}
+	if passphrase == "" {
+		return key
+	}
+	locked, err := gcrypto.PGP().LockKey(key, []byte(passphrase))
+	if err != nil {
+		t.Fatalf("generateTestKey(%s) lock: %v", name, err)
+	}
+	return locked
+}
+
 // --- Integration / User Story Tests ---
 
 // TestStory_AddKeyEncryptDecryptRoundtrip tests the full user journey:
@@ -64,10 +83,7 @@ func TestStory_AddKeyEncryptDecryptRoundtrip(t *testing.T) {
 	a, db := setupTestApp(t)
 
 	// Generate a test key pair
-	priv, err := gcrypto.GenerateKey("Test User", "test@example.com", "pass", 2048)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
+	priv := generateTestKey(t, "Test User", "test@example.com", "pass")
 	privArmored, _ := priv.Armor()
 	pubArmored, _ := priv.GetArmoredPublicKey()
 
@@ -238,10 +254,7 @@ func TestStory_ProtectedRoutesRequireAuth(t *testing.T) {
 func TestStory_AddAndDeleteKey(t *testing.T) {
 	a, db := setupTestApp(t)
 
-	priv, err := gcrypto.GenerateKey("Test Key", "test@test.com", "", 2048)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
+	priv := generateTestKey(t, "Test Key", "test@test.com", "")
 	pubArmored, _ := priv.GetArmoredPublicKey()
 
 	// Add key
@@ -286,7 +299,7 @@ func TestStory_AddAndDeleteKey(t *testing.T) {
 func TestIndexHandler_RendersKeys(t *testing.T) {
 	a, db := setupTestApp(t)
 
-	priv, _ := gcrypto.GenerateKey("Visible Key", "v@test.com", "", 2048)
+	priv := generateTestKey(t, "Visible Key", "v@test.com", "")
 	pubArmored, _ := priv.GetArmoredPublicKey()
 	db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
 		"Visible Key", pubArmored, false, time.Now())
@@ -306,7 +319,7 @@ func TestIndexHandler_RendersKeys(t *testing.T) {
 func TestViewKeyHandler(t *testing.T) {
 	a, db := setupTestApp(t)
 
-	priv, _ := gcrypto.GenerateKey("View Test", "v@test.com", "", 2048)
+	priv := generateTestKey(t, "View Test", "v@test.com", "")
 	pubArmored, _ := priv.GetArmoredPublicKey()
 	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
 		"View Test", pubArmored, false, time.Now())
@@ -415,7 +428,7 @@ func TestEncryptHandler_KeyNotFound(t *testing.T) {
 func TestDecryptHandler_InvalidMessage(t *testing.T) {
 	a, db := setupTestApp(t)
 
-	priv, _ := gcrypto.GenerateKey("Dec Test", "d@t.com", "", 2048)
+	priv := generateTestKey(t, "Dec Test", "d@t.com", "")
 	privArmored, _ := priv.Armor()
 	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
 		"dec-test", privArmored, true, time.Now())
@@ -501,7 +514,7 @@ func TestRateLimit(t *testing.T) {
 func TestAddKeyHandler_WithPassphrase(t *testing.T) {
 	a, db := setupTestApp(t)
 
-	priv, _ := gcrypto.GenerateKey("Pass Key", "p@test.com", "keypass", 2048)
+	priv := generateTestKey(t, "Pass Key", "p@test.com", "keypass")
 	privArmored, _ := priv.Armor()
 
 	form := url.Values{}
@@ -530,7 +543,7 @@ func TestDecryptHandler_LockedKeyWithStoredPassword(t *testing.T) {
 	a, db := setupTestApp(t)
 
 	// Generate a password-protected key
-	priv, _ := gcrypto.GenerateKey("Locked Key", "l@t.com", "keypass", 2048)
+	priv := generateTestKey(t, "Locked Key", "l@t.com", "keypass")
 	privArmored, _ := priv.Armor()
 	pubArmored, _ := priv.GetArmoredPublicKey()
 
@@ -547,10 +560,9 @@ func TestDecryptHandler_LockedKeyWithStoredPassword(t *testing.T) {
 
 	// Encrypt a message with the public key
 	pubKey, _ := gcrypto.NewKeyFromArmored(pubArmored)
-	kr, _ := gcrypto.NewKeyRing(pubKey)
-	msg := gcrypto.NewPlainMessageFromString("secret data")
-	pgpMsg, _ := kr.Encrypt(msg, nil)
-	armored, _ := pgpMsg.GetArmored()
+	encHandle, _ := gcrypto.PGP().Encryption().Recipient(pubKey).New()
+	pgpMsg, _ := encHandle.Encrypt([]byte("secret data"))
+	armored, _ := pgpMsg.Armor()
 
 	// Decrypt using the locked key (should auto-unlock with stored passphrase)
 	form := url.Values{}
@@ -622,7 +634,7 @@ func TestAuthHandler_MasterPasswordNotInEnv(t *testing.T) {
 func TestEncryptHandler_FullPath(t *testing.T) {
 	a, db := setupTestApp(t)
 
-	priv, _ := gcrypto.GenerateKey("Enc Test", "e@test.com", "", 2048)
+	priv := generateTestKey(t, "Enc Test", "e@test.com", "")
 	pubArmored, _ := priv.GetArmoredPublicKey()
 	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
 		"enc-test", pubArmored, false, time.Now())
@@ -760,8 +772,8 @@ func TestDecryptHandler_WrongKey(t *testing.T) {
 	a, db := setupTestApp(t)
 
 	// Store key1 as private key (no passphrase)
-	key1, _ := gcrypto.GenerateKey("Key1", "k1@t.com", "", 2048)
-	key2, _ := gcrypto.GenerateKey("Key2", "k2@t.com", "", 2048)
+	key1 := generateTestKey(t, "Key1", "k1@t.com", "")
+	key2 := generateTestKey(t, "Key2", "k2@t.com", "")
 	priv1Armored, _ := key1.Armor()
 	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
 		"key1", priv1Armored, true, time.Now())
@@ -770,9 +782,9 @@ func TestDecryptHandler_WrongKey(t *testing.T) {
 	// Encrypt a message with key2's public key
 	pub2Armored, _ := key2.GetArmoredPublicKey()
 	pub2, _ := gcrypto.NewKeyFromArmored(pub2Armored)
-	kr, _ := gcrypto.NewKeyRing(pub2)
-	pgpMsg, _ := kr.Encrypt(gcrypto.NewPlainMessageFromString("secret"), nil)
-	encrypted, _ := pgpMsg.GetArmored()
+	encHandle, _ := gcrypto.PGP().Encryption().Recipient(pub2).New()
+	pgpMsg, _ := encHandle.Encrypt([]byte("secret"))
+	encrypted, _ := pgpMsg.Armor()
 
 	// Try to decrypt with key1 (wrong key — should fail)
 	form := url.Values{}
@@ -815,7 +827,7 @@ func TestAddKeyHandler_MasterPasswordNotSetForPassphrase(t *testing.T) {
 	// Clear master password so Crypto.Encrypt fails with ErrMasterPasswordNotSet
 	t.Setenv("MASTER_PASSWORD", "")
 
-	priv, _ := gcrypto.GenerateKey("Test", "t@t.com", "keypass", 2048)
+	priv := generateTestKey(t, "Test", "t@t.com", "keypass")
 	privArmored, _ := priv.Armor()
 
 	form := url.Values{}
@@ -839,7 +851,7 @@ func TestAddKeyHandler_LongPassphraseNoBcryptOverflow(t *testing.T) {
 	a, db := setupTestApp(t)
 
 	longPass := strings.Repeat("x", 80) // 80 bytes — exceeds bcrypt's 72-byte limit
-	priv, _ := gcrypto.GenerateKey("Long Pass", "lp@test.com", longPass, 2048)
+	priv := generateTestKey(t, "Long Pass", "lp@test.com", longPass)
 	privArmored, _ := priv.Armor()
 
 	form := url.Values{}
@@ -870,7 +882,7 @@ func TestAddKeyHandler_LongPassphraseNoBcryptOverflow(t *testing.T) {
 func TestAddKeyHandler_IsPrivateRoundtrip(t *testing.T) {
 	a, db := setupTestApp(t)
 
-	priv, _ := gcrypto.GenerateKey("Priv RT", "rt@test.com", "", 2048)
+	priv := generateTestKey(t, "Priv RT", "rt@test.com", "")
 	privArmored, _ := priv.Armor()
 
 	form := url.Values{}
@@ -898,7 +910,7 @@ func TestAddKeyHandler_IsPrivateRoundtrip(t *testing.T) {
 func TestStory_DecryptRejectsPublicKey(t *testing.T) {
 	a, db := setupTestApp(t)
 
-	priv, _ := gcrypto.GenerateKey("Test", "t@t.com", "", 2048)
+	priv := generateTestKey(t, "Test", "t@t.com", "")
 	pubArmored, _ := priv.GetArmoredPublicKey()
 	res, _ := db.Exec("INSERT INTO keys (name, armored, is_private, created_at) VALUES (?, ?, ?, ?)",
 		"pub-only", pubArmored, false, time.Now())

@@ -3,8 +3,9 @@ package app
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
-	"github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/crypto"
 
 	mm "h-cloud.io/web-gpg/internal/models"
 )
@@ -32,35 +33,20 @@ func (a *App) EncryptHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "stored key is invalid: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	pub, err := kp.GetArmoredPublicKey()
-	if err != nil {
-		slog.Error("encrypt: failed to extract public key", "key_id", keyID, "name", k.Name, "err", err)
-		http.Error(w, "failed to get public key: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	pubKeyObj, err := crypto.NewKeyFromArmored(pub)
-	if err != nil {
-		slog.Error("encrypt: failed to re-parse extracted public key", "key_id", keyID, "name", k.Name, "err", err)
-		http.Error(w, "failed to parse public key: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
 
-	recipientKR, err := crypto.NewKeyRing(pubKeyObj)
+	encHandle, err := crypto.PGP().Encryption().Recipient(kp).New()
 	if err != nil {
-		slog.Error("encrypt: failed to build keyring", "key_id", keyID, "name", k.Name, "err", err)
-		http.Error(w, "failed to create keyring: "+err.Error(), http.StatusInternalServerError)
+		slog.Error("encrypt: failed to build encryption handle", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "failed to prepare encryption: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	message := crypto.NewPlainMessageFromString(plaintext)
-	pgpMsg, err := recipientKR.Encrypt(message, nil)
+	pgpMsg, err := encHandle.Encrypt([]byte(plaintext))
 	if err != nil {
 		slog.Error("PGP encryption failed", "key_id", keyID, "err", err)
 		http.Error(w, "encryption failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	armored, err := pgpMsg.GetArmoredWithCustomHeaders("", "")
+	armored, err := pgpMsg.Armor()
 	if err != nil {
 		slog.Error("encrypt: failed to armor ciphertext", "key_id", keyID, "err", err)
 		http.Error(w, "failed to armor message: "+err.Error(), http.StatusInternalServerError)
@@ -131,21 +117,18 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 		keyToUse = priv
 	}
 
-	kr, err := crypto.NewKeyRing(keyToUse)
-	if err != nil {
-		slog.Error("decrypt: failed to build keyring", "key_id", keyID, "name", k.Name, "err", err)
-		http.Error(w, "failed to create keyring: "+err.Error(), http.StatusInternalServerError)
+	if !strings.HasPrefix(strings.TrimSpace(input), "-----BEGIN PGP MESSAGE-----") {
+		http.Error(w, "invalid armored message", http.StatusUnprocessableEntity)
 		return
 	}
 
-	encMessage, err := crypto.NewPGPMessageFromArmored(input)
+	decHandle, err := crypto.PGP().Decryption().DecryptionKey(keyToUse).New()
 	if err != nil {
-		slog.Warn("decrypt: invalid armored message from user", "key_id", keyID, "err", err)
-		http.Error(w, "invalid armored message: "+err.Error(), http.StatusUnprocessableEntity)
+		slog.Error("decrypt: failed to build decryption handle", "key_id", keyID, "name", k.Name, "err", err)
+		http.Error(w, "failed to prepare decryption: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	decrypted, err := kr.Decrypt(encMessage, nil, 0)
+	decResult, err := decHandle.Decrypt([]byte(input), crypto.Armor)
 	if err != nil {
 		slog.Error("PGP decryption failed", "key_id", keyID, "err", err)
 		http.Error(w, "decryption failed: "+err.Error(), http.StatusInternalServerError)
@@ -153,5 +136,5 @@ func (a *App) DecryptHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(decrypted.GetString()))
+	w.Write(decResult.Bytes())
 }

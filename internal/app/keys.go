@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/crypto"
 	"golang.org/x/crypto/bcrypt"
 
 	cm "h-cloud.io/web-gpg/internal/crypto"
