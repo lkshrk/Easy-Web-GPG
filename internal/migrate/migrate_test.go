@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // setupTestDB creates a fresh test database using SQLite
@@ -18,13 +18,13 @@ func setupTestDB(t *testing.T) (*sql.DB, string, func()) {
 	dbPath := filepath.Join(tmpDir, "test.db")
 
 	// Open SQLite database
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("failed to open test database: %v", err)
 	}
 
 	// SQLite connection string for migrate
-	dbURL := "sqlite3://file:" + dbPath + "?_foreign_keys=1"
+	dbURL := "sqlite://file:" + dbPath + "?_foreign_keys=1"
 
 	cleanup := func() {
 		db.Close()

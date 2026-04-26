@@ -12,7 +12,7 @@ import (
 	"time"
 
 	gcrypto "github.com/ProtonMail/gopenpgp/v2/crypto"
-	_ "github.com/glebarez/sqlite"
+	_ "modernc.org/sqlite"
 	"github.com/jmoiron/sqlx"
 
 	apppkg "h-cloud.io/web-gpg/internal/app"
@@ -31,7 +31,7 @@ func setupTestApp(t *testing.T) (*apppkg.App, *sqlx.DB) {
 	// Use temporary file for SQLite since golang-migrate doesn't support in-memory
 	tmpDir := t.TempDir()
 	dbPath := tmpDir + "/test.db"
-	t.Setenv("DATABASE_URL", "sqlite3://file:"+dbPath+"?_foreign_keys=1")
+	t.Setenv("DATABASE_URL", "sqlite://file:"+dbPath+"?_foreign_keys=1")
 
 	db, err := sqlx.Open("sqlite", "file:"+dbPath+"?_foreign_keys=1&_busy_timeout=5000")
 	if err != nil {

@@ -3,7 +3,7 @@ package crypto_test
 import (
 	"testing"
 
-	_ "github.com/glebarez/sqlite"
+	_ "modernc.org/sqlite"
 	"github.com/jmoiron/sqlx"
 
 	c "h-cloud.io/web-gpg/internal/crypto"

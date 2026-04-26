@@ -8,7 +8,7 @@ import (
 
 	migrate "github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
@@ -31,10 +31,10 @@ func RunMigrations() error {
 	isSQLite := false
 	if dbURL == "" {
 		dbPath := cwd + "/data.db"
-		dbURL = "sqlite3://file:" + dbPath + "?_foreign_keys=1"
+		dbURL = "sqlite://file:" + dbPath + "?_foreign_keys=1"
 		isSQLite = true
 	} else {
-		isSQLite = strings.HasPrefix(strings.ToLower(dbURL), "sqlite3://")
+		isSQLite = strings.HasPrefix(strings.ToLower(dbURL), "sqlite://")
 	}
 
 	// Locate the migrations directory.
