@@ -20,7 +20,7 @@ help:
 	@echo "  test-visual-cleanup - Stop and remove visual test containers"
 	@echo "  clean             - Clean build artifacts"
 	@echo "  docker-build      - Build Docker image"
-	@echo "  docker-run        - Run Docker container"
+	@echo "  docker-run        - Build and run Docker container (port 8080, set MASTER_PASSWORD env)"
 
 # Tailwind CSS standalone CLI
 TAILWIND_BIN := bin/tailwindcss
@@ -100,10 +100,13 @@ clean:
 docker-build:
 	docker build -t easy-web-gpg:latest .
 
-docker-run:
-	docker run -d --name easy-web-gpg -p 8080:8080 \
-		-e MASTER_PASSWORD="${MASTER_PASSWORD}" \
-		-e PORT="${PORT}" \
+docker-run: docker-build
+	@docker rm -f easy-web-gpg 2>/dev/null || true
+	@mkdir -p data
+	docker run --rm --name easy-web-gpg \
+		-p 8080:8080 \
+		-e MASTER_PASSWORD="$${MASTER_PASSWORD}" \
+		-v "$(CURDIR)/data:/data" \
 		easy-web-gpg:latest
 
 test-visual-setup:
