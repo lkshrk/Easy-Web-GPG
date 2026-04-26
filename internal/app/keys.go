@@ -1,6 +1,7 @@
 package app
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"html/template"
@@ -101,7 +102,10 @@ func (a *App) AddKeyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		encrypted = &enc
-		if h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost); err != nil {
+		// Pre-hash with SHA-256 so input is always 32 bytes; bcrypt silently
+		// truncates at 72 bytes and rejects longer inputs in recent versions.
+		ph := sha256.Sum256([]byte(password))
+		if h, err := bcrypt.GenerateFromPassword(ph[:], bcrypt.DefaultCost); err != nil {
 			slog.Warn("failed to bcrypt passphrase; key stored without bcrypt hash", "name", name, "err", err)
 		} else {
 			hs := string(h)
