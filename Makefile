@@ -125,7 +125,7 @@ test-visual-setup:
 		easy-web-gpg:main
 	@echo "Waiting for main branch application to be ready..."
 	@for i in $$(seq 1 30); do \
-		if curl -sf http://localhost:8081/time > /dev/null 2>&1; then \
+		if curl -sf http://localhost:8081/ > /dev/null 2>&1; then \
 			echo "Main branch application is ready"; \
 			break; \
 		fi; \
@@ -138,7 +138,7 @@ test-visual-setup:
 		easy-web-gpg:current
 	@echo "Waiting for current branch application to be ready..."
 	@for i in $$(seq 1 30); do \
-		if curl -sf http://localhost:8080/time > /dev/null 2>&1; then \
+		if curl -sf http://localhost:8080/ > /dev/null 2>&1; then \
 			echo "Current branch application is ready"; \
 			break; \
 		fi; \
@@ -154,6 +154,7 @@ test-visual-cleanup:
 	@echo "Cleaning up visual regression test environment..."
 	@docker stop easy-web-gpg-main easy-web-gpg-current 2>/dev/null || true
 	@docker rm easy-web-gpg-main easy-web-gpg-current 2>/dev/null || true
+	@rm -rf /tmp/easy-web-gpg-main
 	@echo "Cleanup complete"
 
 test-visual: test-visual-setup
@@ -162,8 +163,8 @@ test-visual: test-visual-setup
 	@cd tests && \
 		npm install --silent && \
 		npx playwright install --with-deps chromium --quiet && \
-		BASELINE_URL=http://localhost:8081 BASE_URL=http://localhost:8080 npm run test:visual
-	@$(MAKE) test-visual-cleanup
+		BASELINE_URL=http://localhost:8081 BASE_URL=http://localhost:8080 npm run test:visual; \
+	EXIT=$$?; $(MAKE) test-visual-cleanup; exit $$EXIT
 
 dev-build:
 	@echo "Building development Docker images..."
