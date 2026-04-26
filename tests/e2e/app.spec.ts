@@ -43,7 +43,7 @@ test.describe('Easy Web GPG - Smoke Tests', () => {
     const response = await page.goto(BASE_URL);
     expect(response?.status()).toBe(200);
 
-    await expect(page.locator('h1')).toContainText('PGP Web');
+    await expect(page).toHaveTitle('PGP Web');
   });
 
   test('main UI elements are present', async ({ page }) => {

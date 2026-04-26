@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { compareSnapshot, compareVersions } from './utils/visual-comparison';
+import { compareSnapshot, compareVersions } from '../utils/visual-comparison';
 
 const ROUTES = ['/', '/auth'];
 
@@ -52,7 +52,7 @@ test.describe('Visual Regression Tests', () => {
 test.describe('Functional Tests', () => {
   test('login page loads', async ({ page }) => {
     await page.goto('/auth');
-    await expect(page.locator('h1')).toContainText('Unlock PGP Web');
+    await expect(page.locator('button[type="submit"]')).toContainText('Unlock');
   });
 
   test('shows login error on wrong password', async ({ page }) => {
@@ -61,6 +61,6 @@ test.describe('Functional Tests', () => {
     await page.click('button[type="submit"]');
 
     // Wait for error message
-    await expect(page.locator('.text-rose-600')).toBeVisible();
+    await expect(page.getByText('invalid password')).toBeVisible();
   });
 });
