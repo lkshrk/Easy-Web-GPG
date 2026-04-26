@@ -4,19 +4,16 @@
   <img src=".github/assets/demo.gif" alt="Easy Web GPG demo" style="max-width:900px;width:100%;height:auto;display:block;margin:0 auto;" />
 </div>
 
-Lightweight web UI for encrypting/decrypting PGP messages.
+Lightweight web UI for encrypting and decrypting PGP messages, with master-password-protected access and AES-encrypted key storage.
 
-## Features
-
-- Minimal Tailwind-styled web interface
-- Master-password protected access (24h sessions)
-- AES-encrypted passphrase storage
-
-## Quick Start
+## Docker
 
 ```bash
-export MASTER_PASSWORD='your-secret-password'
-make run
+docker run --rm \
+  -p 8080:8080 \
+  -e MASTER_PASSWORD=your-secret \
+  -v ./data:/data \
+  ghcr.io/lkshrk/easy-web-gpg:latest
 ```
 
 Open http://localhost:8080
@@ -25,56 +22,26 @@ Open http://localhost:8080
 
 | Variable | Required | Description |
 |---|:---:|---|
-| `MASTER_PASSWORD` | yes | Master password for deriving encryption keys (Argon2id) |
-| `DATABASE_URL` | no | Database connection (defaults to SQLite) |
-| `PORT` | no | HTTP port (default: `8080`) |
-| `FORCE_SECURE_COOKIES` | no | Set to `1` for HTTPS environments |
+| `MASTER_PASSWORD` | ✓ | Master password for deriving encryption keys (Argon2id) |
+| `DATABASE_URL` | | Database connection string (defaults to SQLite at `/data/db.sqlite`) |
+| `PORT` | | HTTP port (default: `8080`) |
+| `FORCE_SECURE_COOKIES` | | Set to `1` for HTTPS environments |
 
 ## Development
 
-### Live Reload (Recommended)
-
 ```bash
 export MASTER_PASSWORD=test123
-make dev
+make dev      # live reload (Go + CSS)
+make test     # run tests
+make build    # build binary
 ```
 
-This starts a development environment with:
-- **Automatic Go rebuild** on code changes
-- **Live CSS recompilation** with Tailwind
-- **Template hot reload**
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development guide.
-
-### Other Commands
-
-```bash
-# Run tests
-make test
-
-# Run visual regression tests
-make test-visual
-
-# Build binary
-make build
-
-# Use devcontainer for full dev environment
-# (includes Go, Tailwind CLI, all tools)
-```
-
-See [docs/OPTIMIZATION.md](docs/OPTIMIZATION.md) for architecture details and CI/CD pipeline information.
-
-## Security
-
-⚠️ **Important:**
-- Keep `MASTER_PASSWORD` secret and use a secrets manager in production
-- Run behind HTTPS with `FORCE_SECURE_COOKIES=1`
-- Back up your database to preserve the encryption salt
+Requires Docker. The dev environment hot-reloads Go, templates, and Tailwind CSS.
 
 ## Contributing
 
-Contributions welcome. Open an issue or PR with proposed changes.
+Contributions welcome — open an issue or PR. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-See repository for license details.
+[MIT](LICENSE)

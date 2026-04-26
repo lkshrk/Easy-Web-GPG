@@ -1,28 +1,22 @@
-Contributing
-============
+# Contributing
 
-Thanks for your interest in contributing to Web-GPG. Contributions are welcome and appreciated.
+Contributions are welcome and appreciated.
 
-How to contribute
+## How to contribute
 
-- Fork the repository and create a branch for your change: `feature/your-change`.
-- Open a pull request describing your change, why it's needed, and any relevant notes.
-- Keep PRs small and focused; add tests for new behavior where appropriate.
+- Fork the repository and create a branch: `feature/your-change`.
+- Open a pull request describing what changed and why.
+- Keep PRs small and focused; add tests for new behavior.
 
-Code style and quality
+## Code style
 
-- Go code: follow `gofmt` and `go vet` recommendations.
-- JavaScript/CSS: keep frontend changes small and document any additions to the asset pipeline.
+- Go: follow `gofmt` and `go vet`.
+- Frontend: keep changes minimal; document any additions to the asset pipeline.
 
-Development workflow
+## Development
 
-Use the devcontainer for a consistent environment: run **Dev Containers: Rebuild Container** in VS Code.
-Run the server locally with `go run .` and open `http://localhost:8080`.
+See the Development section in [README.md](README.md).
 
-Security
+## Reporting issues
 
-- Do not commit secrets, private keys, or database files. If you need to share sensitive data for reproduction, redact them and provide steps to recreate the state.
-
-Reporting issues
-
-- Open an issue with a clear title, description, and reproduction steps.
+Open an issue with a clear title, description, and reproduction steps.
