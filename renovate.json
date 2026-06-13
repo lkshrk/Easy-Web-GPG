@@ -1,25 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    ":dependencyDashboard",
-    "group:monorepos",
-    "group:linters",
-    "schedule:earlyMondays"
-  ],
-  "schedule": ["before 7am every weekday"],
-  "timezone": "Europe/Berlin",
-  "labels": ["dependencies"],
-  "platformAutomerge": true,
-  "automergeStrategy": "squash",
-  "prConcurrentLimit": 5,
+  "extends": ["github>lkshrk/woodpecker-ops//renovate/presets/app-library.json5"],
   "packageRules": [
     {
       "matchManagers": ["gomod"],
       "groupName": "Go dependencies",
-      "matchUpdateTypes": ["patch", "minor"],
-      "automerge": true,
-      "automergeType": "pr"
+      "matchUpdateTypes": ["patch", "minor"]
     },
     {
       "matchManagers": ["gomod"],
@@ -30,9 +16,7 @@
       "matchManagers": ["npm"],
       "matchPaths": ["tests/**"],
       "groupName": "Test dependencies",
-      "matchUpdateTypes": ["patch", "minor"],
-      "automerge": true,
-      "automergeType": "pr"
+      "matchUpdateTypes": ["patch", "minor"]
     },
     {
       "matchManagers": ["npm"],
@@ -43,21 +27,11 @@
     {
       "matchManagers": ["dockerfile"],
       "groupName": "Docker base images",
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true,
-      "automergeType": "pr"
+      "matchUpdateTypes": ["minor", "patch"]
     },
     {
       "matchManagers": ["github-actions"],
-      "groupName": "GitHub Actions",
-      "automerge": true,
-      "automergeType": "pr"
+      "groupName": "GitHub Actions"
     }
-  ],
-  "lockFileMaintenance": {
-    "enabled": true,
-    "automerge": true,
-    "automergeType": "branch",
-    "schedule": ["before 4am on sunday"]
-  }
+  ]
 }
