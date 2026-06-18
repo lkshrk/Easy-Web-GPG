@@ -70,7 +70,7 @@ CMD ["air", "-c", ".air.toml"]
 # ------------------------------------------------------------------------------
 # Stage 6: Playwright E2E tests  (docker build --target playwright-test .)
 # ------------------------------------------------------------------------------
-FROM mcr.microsoft.com/playwright:v1.45.0-jammy AS playwright-test
+FROM mcr.microsoft.com/playwright:v1.60.0-jammy AS playwright-test
 
 WORKDIR /app/tests
 COPY tests/package*.json ./
