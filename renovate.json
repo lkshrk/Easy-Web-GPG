@@ -28,7 +28,9 @@
     },
     {
       "matchManagers": ["npm"],
-      "matchPaths": ["tests/**"],
+      "matchFileNames": [
+        "tests/**"
+      ],
       "groupName": "Test dependencies",
       "matchUpdateTypes": ["patch", "minor"],
       "automerge": true,
@@ -36,7 +38,9 @@
     },
     {
       "matchManagers": ["npm"],
-      "matchPaths": ["tests/**"],
+      "matchFileNames": [
+        "tests/**"
+      ],
       "matchUpdateTypes": ["major"],
       "groupName": "Test dependencies (major)"
     },
