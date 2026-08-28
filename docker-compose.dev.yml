@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   css-watcher:
-    image: node:22-alpine
+    image: node:24-alpine
     working_dir: /app
     volumes:
       - ./static:/app/static
