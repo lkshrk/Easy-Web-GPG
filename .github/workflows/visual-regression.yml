@@ -32,12 +32,21 @@ jobs:
 
       - name: Determine baseline SHA
         id: baseline
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            sha="$PR_BASE_SHA"
           else
-            echo "sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+            sha="$PUSH_BEFORE_SHA"
           fi
+          # A force-push leaves `before` unreachable and a new branch sends all zeros.
+          if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+            sha="$(git rev-parse --verify --quiet HEAD^ || true)"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Build baseline image
         run: |
