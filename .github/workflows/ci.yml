@@ -11,7 +11,7 @@ on:
 
 jobs:
   go-tests:
-    name: Go Tests
+    name: Go Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
