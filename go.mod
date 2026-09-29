@@ -3,12 +3,12 @@ module h-cloud.io/web-gpg
 go 1.26.0
 
 require (
-	github.com/ProtonMail/gopenpgp/v3 v3.5.0
+	github.com/ProtonMail/gopenpgp/v3 v3.5.1
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jmoiron/sqlx v1.4.0
 	golang.org/x/crypto v0.57.0
-	modernc.org/sqlite v1.60.0
+	modernc.org/sqlite v1.60.1
 )
 
 require (
