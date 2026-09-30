@@ -14,6 +14,8 @@ github.com/ProtonMail/gopenpgp/v3 v3.4.1 h1:K7uUhSHSJxORZ+RuHpilTT6S4MA2whCRlXNw
 github.com/ProtonMail/gopenpgp/v3 v3.4.1/go.mod h1:bGdV9f6edhmd581wzXsQCTKdH8bXBbyhkgDKPjwPc6U=
 github.com/ProtonMail/gopenpgp/v3 v3.5.0 h1:+MOaMZnAQhCkBBjW6m0wb7TAS08oiK+kZpSKq81at2Y=
 github.com/ProtonMail/gopenpgp/v3 v3.5.0/go.mod h1:Gpizid9smAjmgABRCyu/MlQD1GMSmDLKDOlIQUFSOP4=
+github.com/ProtonMail/gopenpgp/v3 v3.5.1 h1:kKk1gw/kJC8Taze6xa0DPJdOBgGOyQaJdynxBSkLfLk=
+github.com/ProtonMail/gopenpgp/v3 v3.5.1/go.mod h1:Gpizid9smAjmgABRCyu/MlQD1GMSmDLKDOlIQUFSOP4=
 github.com/cloudflare/circl v1.6.3 h1:9GPOhQGF9MCYUeXyMYlqTR6a5gTrgR/fBLXvUgtVcg8=
 github.com/cloudflare/circl v1.6.3/go.mod h1:2eXP6Qfat4O/Yhh8BznvKnJ+uzEoTQ6jVKJRn81BiS4=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
@@ -173,6 +175,8 @@ modernc.org/sqlite v1.59.0 h1:X1es1GpqBlS/5T+vbM4HLUdaa8OtQx468DF2vrx+38A=
 modernc.org/sqlite v1.59.0/go.mod h1:+paeT2A3iPRHkQDwG7oA6Tk0zQd5woMEI8q7orfry8k=
 modernc.org/sqlite v1.60.0 h1:7AZh8lREDo8x3j7aSdF7KGpAKUkJExJ1p67tcRnmttM=
 modernc.org/sqlite v1.60.0/go.mod h1:1dIoEagfDE72QytD5scH1lxARtaUgKgHC/NuApA27r0=
+modernc.org/sqlite v1.60.1 h1:/blz53O951KWFOso4QQvEs/Fq6cDBKLtMVrYNSeJVKw=
+modernc.org/sqlite v1.60.1/go.mod h1:1dIoEagfDE72QytD5scH1lxARtaUgKgHC/NuApA27r0=
 modernc.org/strutil v1.2.1 h1:UneZBkQA+DX2Rp35KcM69cSsNES9ly8mQWD71HKlOA0=
 modernc.org/strutil v1.2.1/go.mod h1:EHkiggD70koQxjVdSBM3JKM7k6L0FbGE5eymy9i3B9A=
 modernc.org/token v1.1.0 h1:Xl7Ap9dKaEs5kLoOQeQmPWevfnk/DM5qcLcYlA8ys6Y=
