@@ -1,25 +1,17 @@
 name: Visual Regression
 
-# Run on every push/PR that doesn't touch visual files — confirms changes
-# are genuine no-ops (dependency bumps, backend refactors, CI changes, etc.).
-# Commits that *do* change templates/CSS skip this workflow entirely.
-#
-# Baseline: the parent commit (push) or base branch tip (PR).
-# This way the comparison is always "did THIS change break the UI?"
-# regardless of accumulated visual changes since the last release.
+# Baseline: the parent commit (push) or base branch tip (PR), so the comparison
+# always answers "did THIS change break the UI?".
 on:
   push:
     branches: ['**']
-    paths-ignore:
-      - 'templates/**'
-      - 'static/css/**'
-      - 'static/img/**'
   pull_request:
     branches: ['**']
-    paths-ignore:
-      - 'templates/**'
-      - 'static/css/**'
-      - 'static/img/**'
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   visual-regression:
@@ -30,8 +22,31 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check for intended UI change
+        id: ui_change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ui-change') }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          skip=false
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            skip="$PR_HAS_LABEL"
+          else
+            labeled="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '[.[].labels[].name] | index("ui-change") != null')"
+            if [ "$labeled" = "true" ]; then
+              skip=true
+            fi
+            case "$HEAD_COMMIT_MESSAGE" in
+              *"[ui-change]"*) skip=true ;;
+            esac
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
       - name: Determine baseline SHA
         id: baseline
+        if: steps.ui_change.outputs.skip != 'true'
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -49,9 +64,11 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Build baseline image
+        if: steps.ui_change.outputs.skip != 'true'
+        env:
+          BASELINE_SHA: ${{ steps.baseline.outputs.sha }}
         run: |
-          BASELINE_SHA="${{ steps.baseline.outputs.sha }}"
-          if [ "$BASELINE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BASELINE_SHA" ]; then
+          if [ -z "$BASELINE_SHA" ]; then
             echo "No parent commit — using current commit as baseline (no regression possible)"
             docker build -t easy-web-gpg:baseline .
           else
@@ -79,39 +96,67 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Start containers
+        env:
+          SKIP_COMPARISON: ${{ steps.ui_change.outputs.skip }}
         run: |
-          docker run -d --name easy-web-gpg-baseline -p 8081:8080 \
-            -e MASTER_PASSWORD=test-password \
-            easy-web-gpg:baseline
           docker run -d --name easy-web-gpg-current -p 8080:8080 \
             -e MASTER_PASSWORD=test-password \
             easy-web-gpg:current
+          if [ "$SKIP_COMPARISON" != "true" ]; then
+            docker run -d --name easy-web-gpg-baseline -p 8081:8080 \
+              -e MASTER_PASSWORD=test-password \
+              easy-web-gpg:baseline
+          fi
 
       - name: Wait for containers
+        env:
+          SKIP_COMPARISON: ${{ steps.ui_change.outputs.skip }}
         run: |
-          for port in 8080 8081; do
-            for i in {1..30}; do
-              if curl -sf http://localhost:$port/ > /dev/null 2>&1; then
-                echo "Port $port ready"
+          wait_ready() {
+            local name="$1" port="$2"
+            for i in $(seq 1 30); do
+              if curl -sf "http://localhost:$port/" > /dev/null 2>&1; then
+                echo "$name ready on port $port"
+                return 0
+              fi
+              if [ "$(docker inspect -f '{{.State.Running}}' "$name")" != "true" ]; then
                 break
               fi
-              echo "Waiting for port $port... ($i/30)"
+              echo "Waiting for $name... ($i/30)"
               sleep 1
             done
-          done
+            echo "::error::$name did not become ready on port $port"
+            docker logs "$name"
+            return 1
+          }
+          wait_ready easy-web-gpg-current 8080
+          if [ "$SKIP_COMPARISON" != "true" ]; then
+            wait_ready easy-web-gpg-baseline 8081
+          fi
 
-      - name: Run visual regression tests
+      - name: Run functional tests
+        working-directory: ./tests
+        env:
+          BASE_URL: http://localhost:8080
+          MASTER_PASSWORD: test-password
+        run: npx playwright test e2e/visual.spec.ts --grep-invert @visual
+
+      - name: Run visual comparison
+        if: steps.ui_change.outputs.skip != 'true'
         working-directory: ./tests
         env:
           BASELINE_URL: http://localhost:8081
           BASE_URL: http://localhost:8080
-        run: npm run test:visual
+          MASTER_PASSWORD: test-password
+        run: npx playwright test e2e/visual.spec.ts --grep @visual
+
+      - name: Visual comparison skipped
+        if: steps.ui_change.outputs.skip == 'true'
+        run: 'echo "::notice::Visual comparison skipped: [ui-change]"'
 
       - name: Stop containers
         if: always()
-        run: |
-          docker stop easy-web-gpg-baseline easy-web-gpg-current 2>/dev/null || true
-          docker rm easy-web-gpg-baseline easy-web-gpg-current 2>/dev/null || true
+        run: docker rm -f easy-web-gpg-baseline easy-web-gpg-current 2>/dev/null || true
 
       - name: Upload visual diffs
         if: failure()
