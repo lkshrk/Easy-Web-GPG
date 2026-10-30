@@ -38,6 +38,8 @@ make build    # build binary
 
 Requires Docker. The dev environment hot-reloads Go, templates, and Tailwind CSS.
 
+CI compares screenshots of every change against its parent commit; add the `ui-change` label to a PR (or `[ui-change]` to a direct push's commit message) when the visual diff is intended, which skips only that comparison.
+
 ## Contributing
 
 Contributions welcome — open an issue or PR. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.

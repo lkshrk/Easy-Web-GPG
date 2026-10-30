@@ -7,6 +7,7 @@ Contributions are welcome and appreciated.
 - Fork the repository and create a branch: `feature/your-change`.
 - Open a pull request describing what changed and why.
 - Keep PRs small and focused; add tests for new behavior.
+- If a PR intentionally changes the UI, add the `ui-change` label so the visual regression comparison is skipped.
 
 ## Code style
 

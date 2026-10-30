@@ -1,28 +1,10 @@
-import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import { test, expect } from '../utils/fixtures';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8080';
 const MASTER_PASSWORD = process.env.MASTER_PASSWORD || 'test-password';
 
-// Simple test PGP public key
-const TEST_PUBLIC_KEY = `-----BEGIN PGP PUBLIC KEY BLOCK-----
-Version: OpenPGP.js v4.10.1
-Comment: https://openpgpjs.org
-
-xsBNBF8H/4UBEACuGVDyIjQ1uQnjz8XwEkLTh0LcO+XO7uqJbQPxJ5k8aR9oY3KL
-d2FhcGNoZXI8dGVzdEBleGFtcGxlLmNvbT7CwHUEEAEIACkFAl8H/4WIQTMJxVZ6
-VRwRqL5QtKyJJY8uWwUCXwf/hg8JGAAAKK4AAAAAAAKEAAAAAAAAP94bWw8ZXhl
-bXBsYXIub3JnLzIwMjEvMTIvMTXIfQQQFggAHwUCXwf/hgkQzCxFVnpXHBGorkC0
-rIkljy5bAAoJEK1MtJTJY8uWUA0F/iRhn5YZCNwvt5ANFF1PiPJjDkQyS8oPGvG8
-NU4Qv4PH7hW2QJBaMNhjwSZPqJPZ/EA/CCK+hY+kLg5YqDZJJPQXFZVC6QkZL4r
-CJYH/MP0L8eMQqvApqCJO7JLN5PrQ2yqxRT7CqAJAA7UCNG8rQrUEAIQEApIBH3H
-cW5KVJh5JVQeKCGDbALCxDVHJSqvDhOFxCj5lwT9aIWTJ4I8YTbGrcvLLQHEKtf
-JtKqJJPPqKFMHHg8QQyMSEfv41YKrIYCqDWKBQQQyQm3xL/kV9vtLdBq2gZLEFf
-/f3UROa1YLQfqPZ2LzVEpR9NyYK64wYQyk5QPw5X1wNQ0QTEVBU0RJT05FPT0i
-QQQLBggJwxsBFiEE7KfPZCJhB9W5vZQPdcYQkNJcW+kFAl8f/+QJEEVZFFRVaG9h
-Y2hlciA8dGVzdEBleGFtcGxlLmNvbT4CmwQkAQAAKf0MACQkQTAAAhmkAAAKKEAA
-AIadQQILCxYIAQEGFQoK
-=2cVc
------END PGP PUBLIC KEY BLOCK-----`;
+const TEST_PUBLIC_KEY = fs.readFileSync(new URL('../fixtures/visual-test-key.pub.asc', import.meta.url), 'utf8');
 
 test.describe('Easy Web GPG - Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -85,32 +67,24 @@ test.describe('Easy Web GPG - Key Management', () => {
     await page.fill('#key-name', keyName);
     await page.fill('#key-armored', TEST_PUBLIC_KEY);
 
-    // Click submit button (form is POST so it redirects)
     await page.click('form[action="/keys"] button[type="submit"]');
 
-    // Wait for navigation after redirect
-    await page.waitForLoadState('load');
-
-    // Test passes if we got here without errors
-    expect(true).toBeTruthy();
+    await expect(page.getByText('Key added successfully')).toBeVisible();
+    await expect(page.locator('#key-select option', { hasText: keyName })).toHaveCount(1);
   });
 
-  test('shows error when adding invalid key', async ({ page }) => {
-    await page.goto(BASE_URL);
+  test.describe('invalid key', () => {
+    test.use({ expectedBrowserErrors: ['Failed to load resource: the server responded with a status of 400 (Bad Request)'] });
 
-    // Try to add invalid key
-    await page.fill('#key-name', 'invalid-key');
-    await page.fill('#key-armored', 'not a valid PGP key at all');
-    await page.click('form[action="/keys"] button[type="submit"]');
+    test('shows error when adding invalid key', async ({ page }) => {
+      await page.goto(BASE_URL);
 
-    // Check for error message
-    const errorDiv = page.locator('#error-msg');
-    await page.waitForTimeout(1000);
+      await page.fill('#key-name', 'invalid-key');
+      await page.fill('#key-armored', 'not a valid PGP key at all');
+      await page.click('form[action="/keys"] button[type="submit"]');
 
-    const isVisible = await errorDiv.isVisible().catch(() => false);
-    if (isVisible) {
-      await expect(errorDiv).toBeVisible();
-    }
+      await expect(page.getByText(/invalid PGP key/)).toBeVisible();
+    });
   });
 });
 

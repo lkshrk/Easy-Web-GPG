@@ -70,14 +70,20 @@ jobs:
 
       - name: Wait for application
         run: |
-          for i in {1..30}; do
+          for i in $(seq 1 30); do
             if curl -sf http://localhost:8080/ > /dev/null 2>&1; then
               echo "Application is ready"
+              exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' easy-web-gpg-test)" != "true" ]; then
               break
             fi
             echo "Waiting for application... ($i/30)"
             sleep 1
           done
+          echo "::error::easy-web-gpg-test did not become ready on port 8080"
+          docker logs easy-web-gpg-test
+          exit 1
 
       - name: Run Playwright tests
         working-directory: ./tests

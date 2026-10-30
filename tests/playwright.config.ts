@@ -7,6 +7,7 @@ export default defineConfig({
   timeout: 15_000,
   workers: process.env.CI ? 2 : 4,
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: !!process.env.CI,
   use: {
     baseURL: BASE_URL,
     screenshot: 'only-on-failure',
