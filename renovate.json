@@ -38,6 +38,11 @@
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "Docker base images"
+    },
+    {
+      "description": "Base image updates ship in the published image, so commit them as fixes to trigger a release",
+      "matchFileNames": ["**/Dockerfile"],
+      "semanticCommitType": "fix"
     }
   ]
 }
