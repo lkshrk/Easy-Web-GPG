@@ -13,15 +13,19 @@ COPY static/css/ ./static/css/
 COPY templates/ ./templates/
 
 ARG BUILDARCH
-RUN TAILWIND_ARCH=$(case ${BUILDARCH:-amd64} in \
-      amd64) echo "x64" ;; \
-      arm64) echo "arm64" ;; \
-      *) echo "x64" ;; \
-    esac) && \
-    curl -sLO "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-${TAILWIND_ARCH}" && \
-    chmod +x "tailwindcss-linux-${TAILWIND_ARCH}" && \
+ARG TAILWIND_VERSION=v4.3.3
+ARG TAILWIND_SHA256_X64=dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a
+ARG TAILWIND_SHA256_ARM64=55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195
+RUN case ${BUILDARCH:-amd64} in \
+      amd64) TAILWIND_ARCH=x64; TAILWIND_SHA256=${TAILWIND_SHA256_X64} ;; \
+      arm64) TAILWIND_ARCH=arm64; TAILWIND_SHA256=${TAILWIND_SHA256_ARM64} ;; \
+      *) echo "unsupported BUILDARCH ${BUILDARCH}" >&2; exit 1 ;; \
+    esac && \
+    curl -fsSL -o tailwindcss "https://github.com/tailwindlabs/tailwindcss/releases/download/${TAILWIND_VERSION}/tailwindcss-linux-${TAILWIND_ARCH}" && \
+    echo "${TAILWIND_SHA256}  tailwindcss" | sha256sum -c - && \
+    chmod +x tailwindcss && \
     mkdir -p static/dist && \
-    "./tailwindcss-linux-${TAILWIND_ARCH}" -i ./static/css/input.css -o ./static/dist/styles.css --minify
+    ./tailwindcss -i ./static/css/input.css -o ./static/dist/styles.css --minify
 
 # ------------------------------------------------------------------------------
 # Stage 2: Go dependencies (shared cache layer)

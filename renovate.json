@@ -10,6 +10,16 @@
   "timezone": "Europe/Berlin",
   "labels": ["dependencies"],
   "prConcurrentLimit": 5,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Tailwind CLI release pinned by version and per-arch SHA256 in the Dockerfile",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": ["ARG TAILWIND_VERSION=(?<currentValue>\\S+)"],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "tailwindlabs/tailwindcss"
+    }
+  ],
   "packageRules": [
     {
       "matchManagers": ["gomod"],
@@ -37,6 +47,12 @@
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "Docker base images"
+    },
+    {
+      "description": "Release assets are pinned by checksum in the Dockerfile; the PR must update TAILWIND_SHA256_* too",
+      "matchDepNames": ["tailwindlabs/tailwindcss"],
+      "addLabels": ["checksum-update"],
+      "automerge": false
     },
     {
       "description": "Base image updates ship in the published image, so commit them as fixes to trigger a release",
