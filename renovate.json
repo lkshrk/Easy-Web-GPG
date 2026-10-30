@@ -1,26 +1,21 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
-    ":dependencyDashboard",
+    "github>lkshrk/gh-ops//renovate/presets/app-library.json5",
+    "github>lkshrk/gh-ops//renovate/presets/automerge-major.json5",
+    "helpers:pinGitHubActionDigests",
     "group:monorepos",
-    "group:linters",
-    "schedule:earlyMondays",
-    "github>lkshrk/gh-ops//renovate/presets/github-actions.json5"
+    "group:linters"
   ],
   "schedule": ["before 7am every weekday"],
   "timezone": "Europe/Berlin",
   "labels": ["dependencies"],
-  "platformAutomerge": true,
-  "automergeStrategy": "squash",
   "prConcurrentLimit": 5,
   "packageRules": [
     {
       "matchManagers": ["gomod"],
-      "groupName": "Go dependencies",
       "matchUpdateTypes": ["patch", "minor"],
-      "automerge": true,
-      "automergeType": "pr"
+      "groupName": "Go dependencies"
     },
     {
       "matchManagers": ["gomod"],
@@ -29,39 +24,20 @@
     },
     {
       "matchManagers": ["npm"],
-      "matchFileNames": [
-        "tests/**"
-      ],
-      "groupName": "Test dependencies",
+      "matchFileNames": ["tests/**"],
       "matchUpdateTypes": ["patch", "minor"],
-      "automerge": true,
-      "automergeType": "pr"
+      "groupName": "Test dependencies"
     },
     {
       "matchManagers": ["npm"],
-      "matchFileNames": [
-        "tests/**"
-      ],
+      "matchFileNames": ["tests/**"],
       "matchUpdateTypes": ["major"],
       "groupName": "Test dependencies (major)"
     },
     {
       "matchManagers": ["dockerfile"],
-      "groupName": "Docker base images",
       "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true,
-      "automergeType": "pr"
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "groupName": "GitHub Actions",
-      "automerge": true,
-      "automergeType": "pr"
+      "groupName": "Docker base images"
     }
-  ],
-  "lockFileMaintenance": {
-    "enabled": true,
-    "automerge": true,
-    "schedule": ["before 4am on sunday"]
-  }
+  ]
 }
