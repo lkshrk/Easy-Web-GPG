@@ -35,17 +35,20 @@
       "matchManagers": ["npm"],
       "matchFileNames": ["tests/**"],
       "matchUpdateTypes": ["patch", "minor"],
+      "matchPackageNames": ["!bun", "!@playwright/test", "!playwright", "!playwright-core", "!@playwright/browser-*", "!@playwright/experimental-ct-*"],
       "groupName": "Test dependencies"
     },
     {
       "matchManagers": ["npm"],
       "matchFileNames": ["tests/**"],
       "matchUpdateTypes": ["major"],
+      "matchPackageNames": ["!bun", "!@playwright/test", "!playwright", "!playwright-core", "!@playwright/browser-*", "!@playwright/experimental-ct-*"],
       "groupName": "Test dependencies (major)"
     },
     {
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["minor", "patch"],
+      "matchPackageNames": ["!node", "!docker.io/node", "!docker.io/library/node", "!index.docker.io/library/node", "!oven/bun", "!docker.io/oven/bun", "!mcr.microsoft.com/playwright"],
       "groupName": "Docker base images"
     },
     {

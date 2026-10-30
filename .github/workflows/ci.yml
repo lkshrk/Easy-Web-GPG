@@ -39,6 +39,7 @@ jobs:
   e2e-tests:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: go-tests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -55,6 +56,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
+        timeout-minutes: 5
         working-directory: ./tests
         run: npx playwright install --with-deps chromium
 

@@ -74,13 +74,12 @@ CMD ["air", "-c", ".air.toml"]
 # ------------------------------------------------------------------------------
 # Stage 6: Playwright E2E tests  (docker build --target playwright-test .)
 # ------------------------------------------------------------------------------
-FROM mcr.microsoft.com/playwright:v1.60.0-jammy AS playwright-test
+FROM mcr.microsoft.com/playwright:v1.64.1-jammy AS playwright-test
 
 WORKDIR /app/tests
 COPY tests/package*.json ./
 RUN npm ci
 COPY tests/ ./
-RUN npx playwright install --with-deps chromium
 CMD ["npx", "playwright", "test", "--reporter=list"]
 
 # ------------------------------------------------------------------------------
