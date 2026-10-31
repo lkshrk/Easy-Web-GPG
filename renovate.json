@@ -6,6 +6,7 @@
     "group:monorepos",
     "group:linters"
   ],
+  "ignorePresets": [":ignoreModulesAndTests"],
   "schedule": ["before 7am every weekday"],
   "timezone": "Europe/Berlin",
   "labels": ["dependencies"],
@@ -35,20 +36,17 @@
       "matchManagers": ["npm"],
       "matchFileNames": ["tests/**"],
       "matchUpdateTypes": ["patch", "minor"],
-      "matchPackageNames": ["!bun", "!@playwright/test", "!playwright", "!playwright-core", "!@playwright/browser-*", "!@playwright/experimental-ct-*"],
       "groupName": "Test dependencies"
     },
     {
       "matchManagers": ["npm"],
       "matchFileNames": ["tests/**"],
       "matchUpdateTypes": ["major"],
-      "matchPackageNames": ["!bun", "!@playwright/test", "!playwright", "!playwright-core", "!@playwright/browser-*", "!@playwright/experimental-ct-*"],
       "groupName": "Test dependencies (major)"
     },
     {
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["minor", "patch"],
-      "matchPackageNames": ["!node", "!docker.io/node", "!docker.io/library/node", "!index.docker.io/library/node", "!oven/bun", "!docker.io/oven/bun", "!mcr.microsoft.com/playwright"],
       "groupName": "Docker base images"
     },
     {
@@ -61,6 +59,11 @@
       "description": "Base image updates ship in the published image, so commit them as fixes to trigger a release",
       "matchFileNames": ["**/Dockerfile"],
       "semanticCommitType": "fix"
+    },
+    {
+      "description": "The test image must match the @playwright/test version",
+      "matchPackageNames": ["@playwright/test", "mcr.microsoft.com/playwright"],
+      "groupName": "Playwright"
     }
   ]
 }
